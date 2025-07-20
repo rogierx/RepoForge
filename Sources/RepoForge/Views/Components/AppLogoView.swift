@@ -8,7 +8,7 @@ struct AppLogoView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 4) {
             Text("""
             ██████╗ ███████╗██████╗  ██████╗ 
             ██╔══██╗██╔════╝██╔══██╗██╔═══██╗
@@ -24,7 +24,7 @@ struct AppLogoView: View {
             ██║     ╚██████╔╝██║  ██║╚██████╔╝███████╗
             ╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝
             """)
-            .font(.system(.caption, design: .monospaced, weight: .medium))
+            .font(.system(size: 7, weight: .medium, design: .monospaced))
             .foregroundColor(.primary)
             .multilineTextAlignment(.center)
             .lineLimit(nil)

@@ -6,12 +6,15 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             SidebarView(viewModel: viewModel)
-                .navigationSplitViewColumnWidth(min: 250, ideal: 280, max: 350)
+                .navigationSplitViewColumnWidth(min: 50, ideal: 50, max: 50)
         } detail: {
             DetailView(viewModel: viewModel)
                 .navigationTitle("")
         }
         .navigationTitle("")
+        .navigationSplitViewStyle(.automatic)
+        .frame(minWidth: 800, minHeight: 500)
+        .background(Color.white)
         .alert("Error", isPresented: .constant(viewModel.errorMessage != nil), actions: {
             Button("OK", role: .cancel) {
                 viewModel.errorMessage = nil
@@ -27,56 +30,62 @@ struct SidebarView: View {
     
     var body: some View {
         ZStack {
-            // Glass background
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(NSColor.controlBackgroundColor).opacity(0.9),
-                    Color(NSColor.windowBackgroundColor).opacity(0.7)
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            // Clean background without separators
+            Color.clear
+                .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Main content
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 16) {
-                        // Recent section
-                        RecentSection()
-                        
-                        // Bookmarks section
-                        BookmarksSection()
-                        
-                        // Output Bookmarks section
-                        OutputBookmarksSection()
+                // Minimized sidebar with only icons
+                VStack(spacing: 20) {
+                    // Recent icon
+                    Button(action: {
+                        print("Recent clicked")
+                    }) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 16))
+                            .foregroundColor(.secondary)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 20)
+                    .buttonStyle(.plain)
+                    
+                    // Bookmarks icon  
+                    Button(action: {
+                        print("Bookmarks clicked")
+                    }) {
+                        Image(systemName: "bookmark")
+                            .font(.system(size: 16))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    
+                    // Output bookmarks icon
+                    Button(action: {
+                        print("Output bookmarks clicked")
+                    }) {
+                        Image(systemName: "doc.badge.plus")
+                            .font(.system(size: 16))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .scrollIndicators(.never)
+                .padding(.top, 20)
                 
                 Spacer()
                 
-                // Settings button in sidebar with glass effect
-                HStack {
-                    Button(action: {}) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 12))
-                            Text("Settings")
-                                .font(.system(size: 12))
-                        }
+                // Settings icon at bottom
+                VStack(spacing: 16) {
+                    Button(action: {
+                        print("Settings clicked")
+                    }) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 16))
+                            .foregroundColor(.secondary)
                     }
-                    .buttonStyle(GlassButtonStyle())
-                    .controlSize(.small)
-                    
-                    Spacer()
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
+                .padding(.bottom, 20)
             }
         }
+        .background(Color.clear)
     }
 }
 
@@ -268,139 +277,89 @@ struct MainInputView: View {
     @ObservedObject var viewModel: MainViewModel
     
     var body: some View {
-        ZStack {
-            // Background gradient for glassmorphism
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(.systemBackground).opacity(0.8),
-                    Color(.controlBackgroundColor).opacity(0.6)
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+        VStack(spacing: 32) {
+            AppLogoView(size: 128)
             
-            VStack(spacing: 32) {
-                AppLogoView(size: 128)
-                
-                // Glass effect container for main form
-                VStack(spacing: 24) {
-                    // Repo type picker with glass effect
-                    VStack(spacing: 16) {
-                        Picker("", selection: $viewModel.repoType) {
-                            ForEach(MainViewModel.RepoType.allCases, id: \.self) { type in
-                                Text(type.rawValue).tag(type)
-                            }
+            // Main form with proper macOS styling
+            VStack(spacing: 24) {
+                VStack(spacing: 16) {
+                    Picker("", selection: $viewModel.repoType) {
+                        ForEach(MainViewModel.RepoType.allCases, id: \.self) { type in
+                            Text(type.rawValue).tag(type)
                         }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        
-                        // Conditional fields based on repo type
-                        if viewModel.repoType == .github {
-                            VStack(spacing: 12) {
-                                TextField("GitHub Repository URL", text: $viewModel.githubURL)
-                                    .textFieldStyle(GlassTextFieldStyle())
-                                
-                                SecureField("Personal Access Token", text: $viewModel.accessToken)
-                                    .textFieldStyle(GlassTextFieldStyle())
-                            }
-                        } else {
-                            HStack {
-                                TextField("Local Repository Path", text: $viewModel.localPath)
-                                    .textFieldStyle(GlassTextFieldStyle())
-                                
-                                Button("Browse") {
-                                    let panel = NSOpenPanel()
-                                    panel.allowsMultipleSelection = false
-                                    panel.canChooseDirectories = true
-                                    panel.canChooseFiles = false
-                                    if panel.runModal() == .OK {
-                                        viewModel.localPath = panel.url?.path ?? ""
-                                    }
-                                }
-                                .buttonStyle(GlassButtonStyle())
-                            }
-                        }
-                        
-                        HStack(spacing: 20) {
-                            Toggle("Include VENV", isOn: $viewModel.includeVirtualEnvironments)
-                                .toggleStyle(GlassToggleStyle())
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    
+                    // Conditional fields based on repo type
+                    if viewModel.repoType == .github {
+                        VStack(spacing: 12) {
+                            TextField("GitHub Repository URL", text: $viewModel.githubURL)
+                                .textFieldStyle(.roundedBorder)
                             
-                            if viewModel.repoType == .github {
-                                Toggle("Save URL and Token", isOn: $viewModel.saveURL)
-                                    .toggleStyle(GlassToggleStyle())
-                            } else {
-                                Toggle("Save Path", isOn: $viewModel.saveURL)
-                                    .toggleStyle(GlassToggleStyle())
+                            // Optional token field
+                            SecureField("Personal Access Token (optional for public repos)", text: $viewModel.accessToken)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                    } else {
+                        HStack {
+                            TextField("Local Repository Path", text: $viewModel.localPath)
+                                .textFieldStyle(.roundedBorder)
+                            
+                            Button("Browse") {
+                                let panel = NSOpenPanel()
+                                panel.allowsMultipleSelection = false
+                                panel.canChooseDirectories = true
+                                panel.canChooseFiles = false
+                                if panel.runModal() == .OK {
+                                    viewModel.localPath = panel.url?.path ?? ""
+                                }
                             }
+                            .buttonStyle(.bordered)
                         }
                     }
-                }
-                .padding(24)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color.white.opacity(0.1))
-                        .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                        )
-                        .blur(radius: 0.5)
-                )
-                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-                .frame(maxWidth: 500)
-                
-                // Process button with glass effect
-                if viewModel.isLoading {
-                    HStack {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                        Text("Processing...")
-                            .font(.system(size: 14, weight: .medium))
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.orange.opacity(0.1))
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
-                            )
-                    )
-                } else {
-                    Button("Process Repository") {
-                        viewModel.processRepository()
-                    }
-                    .buttonStyle(GlassPrimaryButtonStyle())
-                }
-                
-                // Verbose logs with glass effect
-                if !viewModel.verboseLogs.isEmpty {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 4) {
-                            ForEach(viewModel.verboseLogs, id: \.self) { log in
-                                Text(log)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundColor(.secondary)
-                            }
+                    
+                    HStack(spacing: 20) {
+                        Toggle("Include VENV", isOn: $viewModel.includeVirtualEnvironments)
+                        
+                        if viewModel.repoType == .github {
+                            Toggle("Save URL and Token", isOn: $viewModel.saveURL)
+                        } else {
+                            Toggle("Save Path", isOn: $viewModel.saveURL)
                         }
-                        .padding(16)
                     }
-                    .frame(height: 150)
-                    .frame(maxWidth: 500)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.black.opacity(0.05))
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                            )
-                    )
-                    .scrollIndicators(.never)
                 }
             }
-            .padding(40)
+            .padding(32)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color(NSColor.separatorColor), lineWidth: 1)
+                    )
+            )
+            .frame(maxWidth: 500)
+            
+            // Process button with proper macOS styling
+            Button(action: {
+                viewModel.processRepository()
+            }) {
+                HStack {
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                            .progressViewStyle(CircularProgressViewStyle())
+                    }
+                    Text(viewModel.isLoading ? "Processing..." : "Process Repository")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .frame(minWidth: 120)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(viewModel.isLoading)
         }
+        .padding(40)
     }
 }
 

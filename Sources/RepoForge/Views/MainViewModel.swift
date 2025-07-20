@@ -67,9 +67,17 @@ class MainViewModel: ObservableObject {
     // MARK: - Core Logic
     
     func processRepository() {
-        guard !githubURL.isEmpty, !accessToken.isEmpty else {
-            showError("URL and Access Token are required.")
-            return
+        // Validate based on repo type
+        if repoType == .github {
+            guard !githubURL.isEmpty, !accessToken.isEmpty else {
+                showError("URL and Access Token are required.")
+                return
+            }
+        } else {
+            guard !localPath.isEmpty else {
+                showError("Local repository path is required.")
+                return
+            }
         }
         
         // Cancel any existing task.
@@ -82,50 +90,97 @@ class MainViewModel: ObservableObject {
         currentRepository = nil
         verboseLogs.removeAll()
         
-        let service = GitHubService(token: accessToken)
-        self.githubService = service
-        
-        // Start the fully asynchronous processing pipeline.
-        fetchTask = Task(priority: .userInitiated) {
-            do {
-                // 1. Fetch repository metadata.
-                log("Fetching repository metadata...")
-                let repository = try await service.fetchRepository(url: githubURL)
-                if Task.isCancelled { return }
-                
-                // Set the repository on the main thread.
-                await MainActor.run {
-                    self.currentRepository = repository
+        if repoType == .github {
+            // GitHub repository processing
+            let service = GitHubService(token: accessToken)
+            self.githubService = service
+            
+            // Start the fully asynchronous processing pipeline.
+            fetchTask = Task(priority: .userInitiated) {
+                do {
+                    // 1. Fetch repository metadata.
+                    log("Fetching repository metadata...")
+                    let repository = try await service.fetchRepository(url: githubURL)
+                    if Task.isCancelled { return }
+                    
+                    // Set the repository on the main thread.
+                    await MainActor.run {
+                        self.currentRepository = repository
+                    }
+                    
+                    // 2. Build file tree structure in the background.
+                    log("Building file tree structure...")
+                    let rootNode = try await service.buildFileTree(owner: repository.owner.login, repo: repository.name, includeVirtualEnvironments: includeVirtualEnvironments)
+                    if Task.isCancelled { return }
+                    
+                    // 3. Load content and count tokens in the background.
+                    log("Loading content and calculating token counts...")
+                    await loadContentAndCountTokens(for: rootNode, service: service)
+                    if Task.isCancelled { return }
+                    
+                    // 4. Sort the tree by token count.
+                    log("Sorting file tree by token count...")
+                    tokenService.sortNodesByTokenCount(rootNode)
+                    if Task.isCancelled { return }
+                    
+                    // 5. Update the UI once with the final, processed data.
+                    log("Processing complete. Updating UI...")
+                    DispatchQueue.main.async {
+                        self.fileTree = rootNode
+                        self.isLoading = false
+                        self.selectedTab = 1
+                    }
+                    
+                } catch {
+                    if !Task.isCancelled {
+                        showError("Failed to process repository: \(error.localizedDescription)")
+                    }
+                    isLoading = false
                 }
-                
-                // 2. Build file tree structure in the background.
-                log("Building file tree structure...")
-                let rootNode = try await service.buildFileTree(owner: repository.owner.login, repo: repository.name, includeVirtualEnvironments: includeVirtualEnvironments)
-                if Task.isCancelled { return }
-                
-                // 3. Load content and count tokens in the background.
-                log("Loading content and calculating token counts...")
-                await loadContentAndCountTokens(for: rootNode, service: service)
-                if Task.isCancelled { return }
-                
-                // 4. Sort the tree by token count.
-                log("Sorting file tree by token count...")
-                tokenService.sortNodesByTokenCount(rootNode)
-                if Task.isCancelled { return }
-                
-                // 5. Update the UI once with the final, processed data.
-                log("Processing complete. Updating UI...")
-                DispatchQueue.main.async {
-                    self.fileTree = rootNode
-                    self.isLoading = false
-                    self.selectedTab = 1
+            }
+        } else {
+            // Local repository processing
+            fetchTask = Task(priority: .userInitiated) {
+                do {
+                    log("Processing local repository...")
+                    
+                    // Create a mock repository for local processing
+                    let localRepoName = URL(fileURLWithPath: localPath).lastPathComponent
+                    let mockRepo = Repository(
+                        id: 0,
+                        name: localRepoName,
+                        fullName: localRepoName,
+                        description: "Local repository",
+                        htmlUrl: "file://\(localPath)",
+                        defaultBranch: "main",
+                        size: 0,
+                        language: nil,
+                        owner: Repository.Owner(login: "local")
+                    )
+                    
+                    await MainActor.run {
+                        self.currentRepository = mockRepo
+                    }
+                    
+                    log("Building local file tree...")
+                    let rootNode = try await buildLocalFileTree(path: localPath)
+                    if Task.isCancelled { return }
+                    
+                    log("Processing complete. Updating UI...")
+                    DispatchQueue.main.async {
+                        self.fileTree = rootNode
+                        self.isLoading = false
+                        self.selectedTab = 1
+                    }
+                    
+                } catch {
+                    if !Task.isCancelled {
+                        showError("Failed to process local repository: \(error.localizedDescription)")
+                    }
+                    await MainActor.run {
+                        self.isLoading = false
+                    }
                 }
-                
-            } catch {
-                if !Task.isCancelled {
-                    showError("Failed to process repository: \(error.localizedDescription)")
-                }
-                isLoading = false
             }
         }
     }
@@ -248,6 +303,39 @@ class MainViewModel: ObservableObject {
     private func log(_ message: String) {
         print(message)
         verboseLogs.append("[\(Date().formatted(date: .omitted, time: .standard))] \(message)")
+    }
+    
+    private func buildLocalFileTree(path: String) async throws -> FileNode {
+        let url = URL(fileURLWithPath: path)
+        let rootNode = FileNode(name: url.lastPathComponent, path: path, type: .directory)
+        
+        try await processLocalDirectory(url: url, node: rootNode)
+        return rootNode
+    }
+    
+    private func processLocalDirectory(url: URL, node: FileNode) async throws {
+        let fileManager = FileManager.default
+        let contents = try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles])
+        
+        for itemURL in contents {
+            let resourceValues = try itemURL.resourceValues(forKeys: [.isDirectoryKey])
+            let isDirectory = resourceValues.isDirectory ?? false
+            
+            let fileType: FileNode.FileType = isDirectory ? .directory : .file
+            let childNode = FileNode(name: itemURL.lastPathComponent, path: itemURL.path, type: fileType)
+            node.children.append(childNode)
+            
+            if isDirectory {
+                try await processLocalDirectory(url: itemURL, node: childNode)
+            } else {
+                // Read file content and count tokens
+                if let content = try? String(contentsOf: itemURL) {
+                    childNode.content = content
+                    let tokenCount = tokenService.countTokens(in: content)
+                    childNode.addTokens(tokenCount)
+                }
+            }
+        }
     }
     
     private func showError(_ message: String) {
