@@ -190,27 +190,7 @@ struct DetailView: View {
                 }
             }
             
-            ToolbarItem(placement: .primaryAction) {
-                // Export button
-                if selectedDetailTab == "Output" && !viewModel.generatedOutput.isEmpty {
-                    Menu {
-                        Button("Copy to Clipboard") {
-                            let pasteboard = NSPasteboard.general
-                            pasteboard.clearContents()
-                            pasteboard.setString(viewModel.generatedOutput, forType: .string)
-                        }
-                        Button("Copy as Markdown") {}
-                        Button("Save to Desktop (.txt)") {}
-                        Button("Save to Desktop (.md)") {}
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 14))
-                    }
-                    .menuStyle(.borderlessButton)
-                } else {
-                    EmptyView()
-                }
-            }
+
         }
         .onChange(of: viewModel.selectedTab) { newValue in
             // Auto-switch to File Tree when processing completes
@@ -510,11 +490,47 @@ struct OutputMainView: View {
                         HStack {
                             Text("Generated Output")
                                 .font(.headline)
-                            Button("Bookmark") {
-                                // TODO: Implement bookmark
+                            
+                            Spacer()
+                            
+                            // Export options
+                            HStack(spacing: 8) {
+                                Button("Copy") {
+                                    let pasteboard = NSPasteboard.general
+                                    pasteboard.clearContents()
+                                    pasteboard.setString(viewModel.generatedOutput, forType: .string)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                
+                                Button("Copy as Markdown") {
+                                    let pasteboard = NSPasteboard.general
+                                    pasteboard.clearContents()
+                                    pasteboard.setString(viewModel.generatedOutput, forType: .string)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                
+                                Button("Bookmark") {
+                                    // TODO: Implement bookmark
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                
+                                Menu {
+                                    Button("Save to Desktop (.txt)") {
+                                        // TODO: Implement save as txt
+                                    }
+                                    Button("Save to Desktop (.md)") {
+                                        // TODO: Implement save as md
+                                    }
+                                } label: {
+                                    Text("Export")
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                .menuStyle(.borderlessButton)
                             }
-                            .font(.caption)
-                            .buttonStyle(.borderless)
                         }
                         
                         HStack(spacing: 16) {
@@ -541,7 +557,7 @@ struct OutputMainView: View {
                         .textSelection(.enabled)
                         .padding(20)
                 }
-                .scrollIndicators(.never)
+                .scrollIndicators(.visible)
             } else {
                 VStack {
                     Image(systemName: "doc.text")
