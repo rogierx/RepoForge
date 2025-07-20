@@ -467,35 +467,26 @@ struct FileTreeMainView: View {
         VStack(spacing: 0) {
             // Top controls
             HStack {
-                if viewModel.isGeneratingOutput {
-                    HStack {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                        Text("Generating Output...")
-                        Button("Cancel") {
-                            viewModel.cancelGenerateOutput()
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-                } else {
-                    Button(action: {
+                Button(action: {
+                    if viewModel.isGeneratingOutput {
+                        viewModel.cancelGenerateOutput()
+                    } else {
                         viewModel.generateOutput()
-                    }) {
-                        HStack(spacing: 8) {
-                            if viewModel.isGeneratingOutput {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                    .progressViewStyle(CircularProgressViewStyle())
-                            }
-                            Text(viewModel.isGeneratingOutput ? "Generating..." : "Generate Output")
-                                .font(.system(size: 14, weight: .medium))
-                        }
-                        .frame(minWidth: 120)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(viewModel.fileTree == nil || viewModel.isGeneratingOutput)
+                }) {
+                    HStack(spacing: 8) {
+                        if viewModel.isGeneratingOutput {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        }
+                        Text(viewModel.isGeneratingOutput ? "Generating..." : "Generate Output")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                    .frame(minWidth: 140)
                 }
+                .buttonStyle(.borderedProminent)
+                .disabled(viewModel.fileTree == nil)
                 
                 Spacer()
                 

@@ -206,6 +206,7 @@ class MainViewModel: ObservableObject {
             return
         }
         
+        // Immediately update UI to show generating state
         isGeneratingOutput = true
         generatedOutput = ""
         log("Starting optimized output generation...")
@@ -214,16 +215,24 @@ class MainViewModel: ObservableObject {
         generateTask?.cancel()
         
         generateTask = Task {
+            // Yield immediately to allow UI update
+            await Task.yield()
+            
             var outputParts: [String] = []
             
-            // 1. Generate Header
+            await MainActor.run {
+                self.log("Building header and collecting files...")
+            }
+            
+            // 1. Generate Header (moved to background)
+            let treeString = fileTree.generateTreeString()
             let header = """
             Repository: \(repository.fullName)
             Description: \(repository.description ?? "No description")
             Generated at: \(Date())
             
             File Tree:
-            \(fileTree.generateTreeString())
+            \(treeString)
             
             Repository Contents:
             
@@ -245,6 +254,8 @@ class MainViewModel: ObservableObject {
                 self.log("Fetching content for \(filesToProcess.count) files...")
             }
             
+            let startTime = Date()
+            
             // 3. Process files based on repo type
             if repoType == .github {
                 // GitHub repository processing with concurrent content fetching
@@ -252,6 +263,11 @@ class MainViewModel: ObservableObject {
             } else {
                 // Local repository processing
                 await processLocalFiles(filesToProcess, outputParts: &outputParts)
+            }
+            
+            let duration = Date().timeIntervalSince(startTime)
+            await MainActor.run {
+                self.log("Content fetching completed in \(String(format: "%.2f", duration)) seconds")
             }
             
             if Task.isCancelled {

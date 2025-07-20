@@ -60,13 +60,13 @@ class GitHubService: ObservableObject {
     private func buildStructure(owner: String, repo: String, includeVirtualEnvironments: Bool) async throws -> FileNode {
         await MainActor.run { currentStatus = "Fetching repository tree..." }
         
-        // Try to fetch .gitignore file first (repo2txt-style)
-        await MainActor.run { currentStatus = "Loading .gitignore patterns..." }
-        await loadGitIgnoreFile(owner: owner, repo: repo)
+        // Skip .gitignore loading for speed - just use basic filtering
+        // await MainActor.run { currentStatus = "Loading .gitignore patterns..." }
+        // await loadGitIgnoreFile(owner: owner, repo: repo)
         
         do {
             let gitTree = try await fetchRepositoryTree(owner: owner, repo: repo)
-            await MainActor.run { currentStatus = "Processing \(gitTree.tree.count) items with .gitignore filtering..." }
+            await MainActor.run { currentStatus = "Processing \(gitTree.tree.count) items..." }
             return self.buildTreeFromGitTree(gitTree: gitTree, repo: repo, includeVirtualEnvironments: includeVirtualEnvironments)
         } catch {
             await MainActor.run { currentStatus = "Fallback: Using Contents API..." }
@@ -106,20 +106,12 @@ class GitHubService: ObservableObject {
             let fileName = URL(fileURLWithPath: item.path).lastPathComponent
             let isDirectory = item.type != "blob"
             
-            // Apply simple filtering with .gitignore support
-            var shouldInclude = true
-            
-            // Check .gitignore patterns first
-            if gitIgnoreService.shouldIgnore(path: item.path, isDirectory: isDirectory) {
-                shouldInclude = false
-            } else {
-                // Then apply basic exclusion logic
-                shouldInclude = !FileNode.shouldExcludeByDefault(
-                    path: item.path,
-                    name: fileName,
-                    includeVirtualEnvironments: includeVirtualEnvironments
-                )
-            }
+            // Apply basic filtering only (skip .gitignore for speed)
+            let shouldInclude = !FileNode.shouldExcludeByDefault(
+                path: item.path,
+                name: fileName,
+                includeVirtualEnvironments: includeVirtualEnvironments
+            )
             
             // Skip creating nodes for items that should be filtered out
             if !shouldInclude {
