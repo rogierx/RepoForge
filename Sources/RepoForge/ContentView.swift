@@ -500,39 +500,38 @@ struct OutputMainView: View {
                             
                             Spacer()
                             
-                            // Export options
+                            // Export options with icons
                             HStack(spacing: 8) {
-                                Button("Copy") {
+                                Button(action: {
                                     let pasteboard = NSPasteboard.general
                                     pasteboard.clearContents()
                                     pasteboard.setString(viewModel.generatedOutput, forType: .string)
+                                }) {
+                                    Image(systemName: "doc.on.doc")
+                                        .font(.system(size: 12))
                                 }
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
                                 
-                                Button("Copy as Markdown") {
-                                    let pasteboard = NSPasteboard.general
-                                    pasteboard.clearContents()
-                                    pasteboard.setString(viewModel.generatedOutput, forType: .string)
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                                
-                                Button("Bookmark") {
+                                Button(action: {
                                     // TODO: Implement bookmark
+                                }) {
+                                    Image(systemName: "bookmark")
+                                        .font(.system(size: 12))
                                 }
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
                                 
                                 Menu {
-                                    Button("Save to Desktop (.txt)") {
+                                    Button("Save as .txt") {
                                         // TODO: Implement save as txt
                                     }
-                                    Button("Save to Desktop (.md)") {
+                                    Button("Save as .md") {
                                         // TODO: Implement save as md
                                     }
                                 } label: {
-                                    Text("Export")
+                                    Image(systemName: "square.and.arrow.up")
+                                        .font(.system(size: 12))
                                 }
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)

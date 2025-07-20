@@ -82,12 +82,21 @@ class MainViewModel: ObservableObject {
         currentRepository = nil
         verboseLogs.removeAll()
         
-        // Add ASCII banner (smaller version)
+        // Add ASCII banner (smaller ASCII art)
         let asciiBanner = """
-        ╔══════════════════════════════════════════╗
-        ║             REPOFORGE v1.0               ║
-        ║        GitHub to LLM Text Converter      ║
-        ╚══════════════════════════════════════════╝
+        ██████╗ ███████╗██████╗  ██████╗ 
+        ██╔══██╗██╔════╝██╔══██╗██╔═══██╗
+        ██████╔╝█████╗  ██████╔╝██║   ██║
+        ██╔══██╗██╔══╝  ██╔═══╝ ██║   ██║
+        ██║  ██║███████╗██║     ╚██████╔╝
+        ╚═╝  ╚═╝╚══════╝╚═╝      ╚═════╝ 
+        
+        ███████╗ ██████╗ ██████╗  ██████╗ ███████╗
+        ██╔════╝██╔═══██╗██╔══██╗██╔════╝ ██╔════╝
+        █████╗  ██║   ██║██████╔╝██║  ███╗█████╗  
+        ██╔══╝  ██║   ██║██╔══██╗██║   ██║██╔══╝  
+        ██║     ╚██████╔╝██║  ██║╚██████╔╝███████╗
+        ╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝
         """
         log(asciiBanner)
         log("")
@@ -182,8 +191,8 @@ class MainViewModel: ObservableObject {
                 self.log("Generating simplified output...")
             }
             
-            // Create a very simple output to avoid freezing
-            let output = """
+            // Create proper output with file tree and contents
+            var output = """
             Repository: \(repository.fullName)
             Description: \(repository.description ?? "No description")
             Generated at: \(Date())
@@ -191,9 +200,12 @@ class MainViewModel: ObservableObject {
             File Tree:
             \(fileTree.generateTreeString())
             
-            Status: Output generation working! 
-            Files in repository: \(countFiles(fileTree))
+            Repository Contents:
+            
             """
+            
+            // Add file contents
+            await addFileContents(fileTree, to: &output)
             
             // Yield control to prevent blocking
             await Task.yield()
@@ -231,6 +243,25 @@ class MainViewModel: ObservableObject {
             count = 1
         }
         return count
+    }
+    
+    private func addFileContents(_ node: FileNode, to output: inout String) async {
+        if node.isDirectory {
+            for child in node.children {
+                await addFileContents(child, to: &output)
+            }
+        } else if node.isIncluded && node.content != nil {
+            output += """
+            
+            ---
+            File: \(node.path)
+            ---
+            \(node.content ?? "")
+            
+            """
+            // Yield occasionally to prevent blocking
+            await Task.yield()
+        }
     }
     
     private func log(_ message: String) {
