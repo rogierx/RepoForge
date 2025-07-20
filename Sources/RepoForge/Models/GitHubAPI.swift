@@ -42,6 +42,19 @@ struct RepositoryContent: Codable {
         case name, path, type, size, content, encoding
         case downloadUrl = "download_url"
     }
+    
+    var decodedContent: String? {
+        guard let content = content, let encoding = encoding else { return nil }
+        
+        if encoding == "base64" {
+            // Remove any whitespace and newlines from the base64 string
+            let cleanedContent = content.replacingOccurrences(of: "\\s", with: "", options: .regularExpression)
+            guard let data = Data(base64Encoded: cleanedContent) else { return nil }
+            return String(data: data, encoding: .utf8)
+        }
+        
+        return content
+    }
 }
 
 struct GitTree: Codable {

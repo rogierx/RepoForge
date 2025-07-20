@@ -479,21 +479,34 @@ struct FileTreeMainView: View {
                         .controlSize(.small)
                     }
                 } else {
-                    Button("Generate Output") {
+                    Button(action: {
                         viewModel.generateOutput()
+                    }) {
+                        HStack(spacing: 8) {
+                            if viewModel.isGeneratingOutput {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                    .progressViewStyle(CircularProgressViewStyle())
+                            }
+                            Text(viewModel.isGeneratingOutput ? "Generating..." : "Generate Output")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .frame(minWidth: 120)
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(viewModel.fileTree == nil)
+                    .disabled(viewModel.fileTree == nil || viewModel.isGeneratingOutput)
                 }
                 
                 Spacer()
                 
-                // Token counts
-                if let fileTree = viewModel.fileTree {
-                    TokenCountsView(fileTree: fileTree)
+                // Token counts and exclude button
+                HStack(spacing: 12) {
+                    if let fileTree = viewModel.fileTree {
+                        TokenCountsView(fileTree: fileTree)
+                    }
+                    
+                    ExcludeOptionsView()
                 }
-                
-                ExcludeOptionsView()
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
@@ -507,7 +520,7 @@ struct FileTreeMainView: View {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         FileTreeNodeView(node: fileTree, level: 0)
                     }
-                    .padding(.leading, 20)
+                    .padding(.horizontal, 20)
                     .padding(.vertical, 12)
                 }
                 .scrollIndicators(.never)
@@ -796,14 +809,24 @@ struct ExcludeOptionsView: View {
         Button(action: {
             showingPopover.toggle()
         }) {
-            HStack(spacing: 4) {
-                Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 12))
-                Text("Exclude")
+            HStack(spacing: 6) {
+                Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 13))
+                Text("Exclude")
+                    .font(.system(size: 13, weight: .medium))
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.borderless)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(NSColor.separatorColor), lineWidth: 1)
+                )
+        )
         .popover(isPresented: $showingPopover) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Exclude Options")

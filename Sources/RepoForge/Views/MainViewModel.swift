@@ -98,44 +98,41 @@ class MainViewModel: ObservableObject {
             // Start the fully asynchronous processing pipeline.
             fetchTask = Task(priority: .userInitiated) {
                 do {
-                    // 1. Fetch repository metadata.
+                    // --- PHASE 1: Build Structure (Fast) ---
                     log("Fetching repository metadata...")
                     let repository = try await service.fetchRepository(url: githubURL)
                     if Task.isCancelled { return }
                     
-                    // Set the repository on the main thread.
                     await MainActor.run {
                         self.currentRepository = repository
                     }
                     
-                    // 2. Build file tree structure in the background.
                     log("Building file tree structure...")
+                    // This now ONLY builds the node hierarchy, without content. It will be very fast.
                     let rootNode = try await service.buildFileTree(owner: repository.owner.login, repo: repository.name, includeVirtualEnvironments: includeVirtualEnvironments)
                     if Task.isCancelled { return }
-                    
-                    // 3. Load content and count tokens in the background.
-                    log("Loading content and calculating token counts...")
-                    await loadContentAndCountTokens(for: rootNode, service: service)
-                    if Task.isCancelled { return }
-                    
-                    // 4. Sort the tree by token count.
-                    log("Sorting file tree by token count...")
+
+                    // OPTIONAL: Estimate tokens based on file size for a preliminary view.
+                    log("Estimating token counts...")
+                    estimateTokenCounts(for: rootNode)
+
+                    // Sort the tree based on initial estimates
                     tokenService.sortNodesByTokenCount(rootNode)
-                    if Task.isCancelled { return }
                     
-                    // 5. Update the UI once with the final, processed data.
-                    log("Processing complete. Updating UI...")
-                    DispatchQueue.main.async {
+                    log("Structure built. Updating UI...")
+                    await MainActor.run {
                         self.fileTree = rootNode
-                        self.isLoading = false
-                        self.selectedTab = 1
+                        self.isLoading = false // Stop loading indicator HERE
+                        self.selectedTab = 1   // Switch to the file tree view
                     }
                     
                 } catch {
                     if !Task.isCancelled {
                         showError("Failed to process repository: \(error.localizedDescription)")
                     }
-                    isLoading = false
+                    await MainActor.run {
+                        self.isLoading = false
+                    }
                 }
             }
         } else {
@@ -185,50 +182,42 @@ class MainViewModel: ObservableObject {
         }
     }
     
-    private func loadContentAndCountTokens(for node: FileNode, service: GitHubService) async {
-        guard let repo = self.currentRepository else { return }
-        
-        await withTaskGroup(of: Void.self) { group in
-            func traverse(node: FileNode) {
-                if node.isDirectory {
-                    for child in node.children {
-                        traverse(node: child)
-                    }
-                } else {
-                    group.addTask {
-                        await service.loadContent(for: node, owner: repo.owner.login, repo: repo.name)
-                        if let content = node.content {
-                            let tokenCount = self.tokenService.countTokens(in: content)
-                            node.addTokens(tokenCount)
-                        }
-                    }
-                }
+    // New helper method to give users a rough idea of token counts without fetching content.
+    private func estimateTokenCounts(for node: FileNode) {
+        if node.isDirectory {
+            var estimatedTokens = 0
+            for child in node.children {
+                estimateTokenCounts(for: child)
+                estimatedTokens += child.totalTokenCount
             }
-            traverse(node: node)
+            node.tokenCount = estimatedTokens
+            node.totalTokenCount = estimatedTokens
+        } else {
+            // A common heuristic: ~4 characters per token.
+            let estimated = max(1, Int(ceil(Double(node.size) / 4.0)))
+            node.tokenCount = estimated
+            node.totalTokenCount = estimated
         }
     }
 
     func generateOutput() {
-        guard let repository = currentRepository,
-              let fileTree = fileTree else {
-            showError("No repository data available to generate output")
+        guard let repository = currentRepository, let fileTree = fileTree else {
+            showError("Cannot generate output. Missing repository data.")
             return
         }
         
-        log("Starting simple output generation...")
         isGeneratingOutput = true
         generatedOutput = ""
+        log("Starting optimized output generation...")
         
         // Cancel any existing generation task
         generateTask?.cancel()
         
         generateTask = Task {
-            await MainActor.run {
-                self.log("Generating simplified output...")
-            }
+            var outputParts: [String] = []
             
-            // Create proper output with file tree and contents
-            var output = """
+            // 1. Generate Header
+            let header = """
             Repository: \(repository.fullName)
             Description: \(repository.description ?? "No description")
             Generated at: \(Date())
@@ -239,18 +228,46 @@ class MainViewModel: ObservableObject {
             Repository Contents:
             
             """
+            outputParts.append(header)
             
-            // Add file contents
-            await addFileContents(fileTree, to: &output)
-            
-            // Yield control to prevent blocking
-            await Task.yield()
+            // 2. Collect all file nodes to be included
+            var filesToProcess: [FileNode] = []
+            func collectFiles(_ node: FileNode) {
+                if node.isDirectory {
+                    node.children.forEach(collectFiles)
+                } else if node.isIncluded {
+                    filesToProcess.append(node)
+                }
+            }
+            collectFiles(fileTree)
             
             await MainActor.run {
-                self.log("Output generated successfully, length: \(output.count)")
-                self.generatedOutput = output
+                self.log("Fetching content for \(filesToProcess.count) files...")
+            }
+            
+            // 3. Process files based on repo type
+            if repoType == .github {
+                // GitHub repository processing with concurrent content fetching
+                await processGitHubFiles(filesToProcess, repository: repository, outputParts: &outputParts)
+            } else {
+                // Local repository processing
+                await processLocalFiles(filesToProcess, outputParts: &outputParts)
+            }
+            
+            if Task.isCancelled {
+                await MainActor.run {
+                    self.log("Output generation cancelled.")
+                    self.isGeneratingOutput = false
+                }
+                return
+            }
+
+            // 4. Assemble the final output
+            await MainActor.run {
+                self.log("Generation complete.")
+                self.generatedOutput = outputParts.joined(separator: "\n")
                 self.isGeneratingOutput = false
-                self.log("Output generation completed!")
+                self.selectedTab = 2 // Switch to output view
             }
         }
     }
@@ -281,24 +298,7 @@ class MainViewModel: ObservableObject {
         return count
     }
     
-    private func addFileContents(_ node: FileNode, to output: inout String) async {
-        if node.isDirectory {
-            for child in node.children {
-                await addFileContents(child, to: &output)
-            }
-        } else if node.isIncluded && node.content != nil {
-            output += """
-            
-            ---
-            File: \(node.path)
-            ---
-            \(node.content ?? "")
-            
-            """
-            // Yield occasionally to prevent blocking
-            await Task.yield()
-        }
-    }
+
     
     private func log(_ message: String) {
         print(message)
@@ -335,6 +335,66 @@ class MainViewModel: ObservableObject {
                     childNode.addTokens(tokenCount)
                 }
             }
+        }
+    }
+    
+    private func processGitHubFiles(_ filesToProcess: [FileNode], repository: Repository, outputParts: inout [String]) async {
+        guard let githubService = self.githubService else { return }
+        
+        var processedFileContents = [(path: String, content: String)](repeating: ("", ""), count: filesToProcess.count)
+        
+        await withTaskGroup(of: (Int, String, String).self) { group in
+            for (index, node) in filesToProcess.enumerated() {
+                group.addTask {
+                    do {
+                        let contentResponse = try await githubService.fetchFileContent(owner: repository.owner.login, repo: repository.name, path: node.path)
+                        let fileContent = contentResponse.decodedContent ?? "// Failed to decode content"
+                        return (index, node.path, fileContent)
+                    } catch {
+                        return (index, node.path, "// Error loading content: \(error.localizedDescription)")
+                    }
+                }
+            }
+            
+            for await (index, path, content) in group {
+                if Task.isCancelled { break }
+                processedFileContents[index] = (path, content)
+            }
+        }
+        
+        // Add file contents to output
+        for (path, content) in processedFileContents {
+            let fileSection = """
+            ---
+            File: \(path)
+            ---
+            \(content)
+            
+            """
+            outputParts.append(fileSection)
+        }
+    }
+    
+    private func processLocalFiles(_ filesToProcess: [FileNode], outputParts: inout [String]) async {
+        for node in filesToProcess {
+            if Task.isCancelled { break }
+            
+            let content = node.content ?? {
+                if let loadedContent = try? String(contentsOfFile: node.path) {
+                    return loadedContent
+                } else {
+                    return "// Error loading local file content"
+                }
+            }()
+            
+            let fileSection = """
+            ---
+            File: \(node.path)
+            ---
+            \(content)
+            
+            """
+            outputParts.append(fileSection)
         }
     }
     

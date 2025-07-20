@@ -209,7 +209,7 @@ class GitHubService: ObservableObject {
         return try await performRequest(endpoint: endpoint, type: GitTree.self)
     }
     
-    private func fetchFileContent(owner: String, repo: String, path: String) async throws -> RepositoryContent {
+    func fetchFileContent(owner: String, repo: String, path: String) async throws -> RepositoryContent {
         let endpoint = "\(config.baseURL)/repos/\(owner)/\(repo)/contents/\(path)"
         return try await performRequest(endpoint: endpoint, type: RepositoryContent.self)
     }
