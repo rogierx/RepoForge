@@ -9,7 +9,9 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 250, ideal: 280, max: 350)
         } detail: {
             DetailView(viewModel: viewModel)
+                .navigationTitle("")
         }
+        .navigationTitle("")
         .alert("Error", isPresented: .constant(viewModel.errorMessage != nil), actions: {
             Button("OK", role: .cancel) {
                 viewModel.errorMessage = nil
@@ -43,24 +45,6 @@ struct SidebarView: View {
             .scrollIndicators(.never) // Apple native smaller scrollers
             
             Spacer()
-            
-            // Settings button in sidebar
-            HStack {
-                Button(action: {}) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 12))
-                        Text("Settings")
-                            .font(.system(size: 12))
-                    }
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
         }
         .background(Color(.controlBackgroundColor))
     }
@@ -227,7 +211,7 @@ struct MainInputView: View {
     
     var body: some View {
         VStack(spacing: 24) {
-            AppLogoView(size: 96)
+            AppLogoView(size: 128)
             
             VStack(spacing: 16) {
                 // Repo type picker
@@ -293,6 +277,22 @@ struct MainInputView: View {
                 .cornerRadius(8)
                 .scrollIndicators(.never)
             }
+            
+            // Settings button with greyish background
+            Button(action: {}) {
+                HStack(spacing: 8) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 14))
+                    Text("Settings")
+                        .font(.system(size: 14))
+                }
+                .foregroundColor(.primary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color(.controlBackgroundColor))
+                .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
         }
         .padding(40)
     }
