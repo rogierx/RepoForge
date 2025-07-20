@@ -43,6 +43,24 @@ struct SidebarView: View {
             .scrollIndicators(.never) // Apple native smaller scrollers
             
             Spacer()
+            
+            // Settings button in sidebar
+            HStack {
+                Button(action: {}) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 12))
+                        Text("Settings")
+                            .font(.system(size: 12))
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
         }
         .background(Color(.controlBackgroundColor))
     }
@@ -229,17 +247,17 @@ struct MainInputView: View {
     
     var body: some View {
         VStack(spacing: 24) {
-            AppLogoView(size: 64)
-            Text("RepoForge").font(.largeTitle).bold()
+            AppLogoView(size: 96)
             
             VStack(spacing: 16) {
                 // Repo type picker
-                Picker("Repository Type", selection: $viewModel.repoType) {
+                Picker("", selection: $viewModel.repoType) {
                     ForEach(MainViewModel.RepoType.allCases, id: \.self) { type in
                         Text(type.rawValue).tag(type)
                     }
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
                 
                 // Conditional fields based on repo type
                 if viewModel.repoType == .github {
@@ -659,17 +677,6 @@ struct ExcludeOptionsView: View {
 struct FooterView: View {
     var body: some View {
         HStack {
-            Button(action: {}) {
-                HStack(spacing: 6) {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 12))
-                    Text("Settings")
-                        .font(.system(size: 12))
-                }
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            
             Spacer()
             
             Button(action: {
