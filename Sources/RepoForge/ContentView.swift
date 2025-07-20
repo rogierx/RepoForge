@@ -45,6 +45,24 @@ struct SidebarView: View {
             .scrollIndicators(.never) // Apple native smaller scrollers
             
             Spacer()
+            
+            // Settings button in sidebar
+            HStack {
+                Button(action: {}) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 12))
+                        Text("Settings")
+                            .font(.system(size: 12))
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
         }
         .background(Color(.controlBackgroundColor))
     }
@@ -249,6 +267,11 @@ struct MainInputView: View {
                 }
                 
                 Toggle("Include Virtual Environments", isOn: $viewModel.includeVirtualEnvironments)
+                
+                HStack {
+                    Toggle("Save URL", isOn: $viewModel.saveURL)
+                    Toggle("Save Token", isOn: $viewModel.saveToken)
+                }
             }
             .frame(maxWidth: 400)
             
@@ -677,18 +700,6 @@ struct ExcludeOptionsView: View {
 struct FooterView: View {
     var body: some View {
         HStack {
-            // Small Settings button in bottom left
-            Button(action: {}) {
-                HStack(spacing: 4) {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 10))
-                    Text("Settings")
-                        .font(.system(size: 10))
-                }
-                .foregroundColor(.secondary)
-            }
-            .buttonStyle(.plain)
-            
             Spacer()
             
             Button(action: {
