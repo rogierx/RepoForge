@@ -82,25 +82,6 @@ class MainViewModel: ObservableObject {
         currentRepository = nil
         verboseLogs.removeAll()
         
-        // Add ASCII banner (smaller ASCII art)
-        let asciiBanner = """
-        ██████╗ ███████╗██████╗  ██████╗ 
-        ██╔══██╗██╔════╝██╔══██╗██╔═══██╗
-        ██████╔╝█████╗  ██████╔╝██║   ██║
-        ██╔══██╗██╔══╝  ██╔═══╝ ██║   ██║
-        ██║  ██║███████╗██║     ╚██████╔╝
-        ╚═╝  ╚═╝╚══════╝╚═╝      ╚═════╝ 
-        
-        ███████╗ ██████╗ ██████╗  ██████╗ ███████╗
-        ██╔════╝██╔═══██╗██╔══██╗██╔════╝ ██╔════╝
-        █████╗  ██║   ██║██████╔╝██║  ███╗█████╗  
-        ██╔══╝  ██║   ██║██╔══██╗██║   ██║██╔══╝  
-        ██║     ╚██████╔╝██║  ██║╚██████╔╝███████╗
-        ╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝
-        """
-        log(asciiBanner)
-        log("")
-        
         let service = GitHubService(token: accessToken)
         self.githubService = service
         

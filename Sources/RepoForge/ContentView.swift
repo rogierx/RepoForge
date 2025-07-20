@@ -26,51 +26,63 @@ struct SidebarView: View {
     @ObservedObject var viewModel: MainViewModel
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Main content
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    // Recent section
-                    RecentSection()
-                    
-                    // Bookmarks section
-                    BookmarksSection()
-                    
-                    // Output Bookmarks section
-                    OutputBookmarksSection()
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-            }
-            .scrollIndicators(.never) // Apple native smaller scrollers
+        ZStack {
+            // Glass background
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(NSColor.controlBackgroundColor).opacity(0.9),
+                    Color(NSColor.windowBackgroundColor).opacity(0.7)
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
             
-            Spacer()
-            
-            // Settings button in sidebar
-            HStack {
-                Button(action: {}) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 12))
-                        Text("Settings")
-                            .font(.system(size: 12))
+            VStack(spacing: 0) {
+                // Main content
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        // Recent section
+                        RecentSection()
+                        
+                        // Bookmarks section
+                        BookmarksSection()
+                        
+                        // Output Bookmarks section
+                        OutputBookmarksSection()
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 20)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .scrollIndicators(.never)
                 
                 Spacer()
+                
+                // Settings button in sidebar with glass effect
+                HStack {
+                    Button(action: {}) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 12))
+                            Text("Settings")
+                                .font(.system(size: 12))
+                        }
+                    }
+                    .buttonStyle(GlassButtonStyle())
+                    .controlSize(.small)
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
         }
-        .background(Color(.controlBackgroundColor))
     }
 }
 
 struct RecentSection: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: "clock")
                     .font(.system(size: 12))
@@ -79,11 +91,20 @@ struct RecentSection: View {
                     .font(.system(size: 13, weight: .medium))
             }
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 RecentItemView(name: "RechtGPT-V2", date: "20-07-25")
             }
             .padding(.leading, 16)
         }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.05))
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
     }
 }
 
@@ -111,7 +132,7 @@ struct RecentItemView: View {
 
 struct BookmarksSection: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: "bookmark")
                     .font(.system(size: 12))
@@ -124,6 +145,7 @@ struct BookmarksSection: View {
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
+                .buttonStyle(.plain)
             }
             
             Text("No bookmarks yet")
@@ -131,12 +153,21 @@ struct BookmarksSection: View {
                 .foregroundColor(.secondary)
                 .padding(.leading, 16)
         }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.05))
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
     }
 }
 
 struct OutputBookmarksSection: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: "doc.badge.plus")
                     .font(.system(size: 12))
@@ -150,6 +181,15 @@ struct OutputBookmarksSection: View {
                 .foregroundColor(.secondary)
                 .padding(.leading, 16)
         }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.05))
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
     }
 }
 
@@ -228,80 +268,236 @@ struct MainInputView: View {
     @ObservedObject var viewModel: MainViewModel
     
     var body: some View {
-        VStack(spacing: 24) {
-            AppLogoView(size: 128)
+        ZStack {
+            // Background gradient for glassmorphism
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(.systemBackground).opacity(0.8),
+                    Color(.controlBackgroundColor).opacity(0.6)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
             
-            VStack(spacing: 16) {
-                // Repo type picker
-                Picker("", selection: $viewModel.repoType) {
-                    ForEach(MainViewModel.RepoType.allCases, id: \.self) { type in
-                        Text(type.rawValue).tag(type)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+            VStack(spacing: 32) {
+                AppLogoView(size: 128)
                 
-                // Conditional fields based on repo type
-                if viewModel.repoType == .github {
-                    TextField("GitHub Repository URL", text: $viewModel.githubURL)
-                        .textFieldStyle(.roundedBorder)
-                    
-                    SecureField("Personal Access Token", text: $viewModel.accessToken)
-                        .textFieldStyle(.roundedBorder)
-                } else {
-                    HStack {
-                        TextField("Local Repository Path", text: $viewModel.localPath)
-                            .textFieldStyle(.roundedBorder)
-                        
-                        Button("Browse") {
-                            let panel = NSOpenPanel()
-                            panel.allowsMultipleSelection = false
-                            panel.canChooseDirectories = true
-                            panel.canChooseFiles = false
-                            if panel.runModal() == .OK {
-                                viewModel.localPath = panel.url?.path ?? ""
+                // Glass effect container for main form
+                VStack(spacing: 24) {
+                    // Repo type picker with glass effect
+                    VStack(spacing: 16) {
+                        Picker("", selection: $viewModel.repoType) {
+                            ForEach(MainViewModel.RepoType.allCases, id: \.self) { type in
+                                Text(type.rawValue).tag(type)
                             }
                         }
-                        .buttonStyle(.bordered)
-                    }
-                }
-                
-                Toggle("Include Virtual Environments", isOn: $viewModel.includeVirtualEnvironments)
-                
-                HStack {
-                    Toggle("Save URL", isOn: $viewModel.saveURL)
-                    Toggle("Save Token", isOn: $viewModel.saveToken)
-                }
-            }
-            .frame(maxWidth: 400)
-            
-            if viewModel.isLoading {
-                ProgressView("Processing...")
-            } else {
-                Button("Process Repository") {
-                    viewModel.processRepository()
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            
-            if !viewModel.verboseLogs.isEmpty {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(viewModel.verboseLogs, id: \.self) { log in
-                            Text(log)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        
+                        // Conditional fields based on repo type
+                        if viewModel.repoType == .github {
+                            VStack(spacing: 12) {
+                                TextField("GitHub Repository URL", text: $viewModel.githubURL)
+                                    .textFieldStyle(GlassTextFieldStyle())
+                                
+                                SecureField("Personal Access Token", text: $viewModel.accessToken)
+                                    .textFieldStyle(GlassTextFieldStyle())
+                            }
+                        } else {
+                            HStack {
+                                TextField("Local Repository Path", text: $viewModel.localPath)
+                                    .textFieldStyle(GlassTextFieldStyle())
+                                
+                                Button("Browse") {
+                                    let panel = NSOpenPanel()
+                                    panel.allowsMultipleSelection = false
+                                    panel.canChooseDirectories = true
+                                    panel.canChooseFiles = false
+                                    if panel.runModal() == .OK {
+                                        viewModel.localPath = panel.url?.path ?? ""
+                                    }
+                                }
+                                .buttonStyle(GlassButtonStyle())
+                            }
+                        }
+                        
+                        HStack(spacing: 20) {
+                            Toggle("Include VENV", isOn: $viewModel.includeVirtualEnvironments)
+                                .toggleStyle(GlassToggleStyle())
+                            
+                            if viewModel.repoType == .github {
+                                Toggle("Save URL and Token", isOn: $viewModel.saveURL)
+                                    .toggleStyle(GlassToggleStyle())
+                            } else {
+                                Toggle("Save Path", isOn: $viewModel.saveURL)
+                                    .toggleStyle(GlassToggleStyle())
+                            }
                         }
                     }
-                    .padding()
                 }
-                .frame(height: 120)
-                .background(Color(.controlBackgroundColor))
-                .cornerRadius(8)
-                .scrollIndicators(.never)
+                .padding(24)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.white.opacity(0.1))
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        )
+                        .blur(radius: 0.5)
+                )
+                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                .frame(maxWidth: 500)
+                
+                // Process button with glass effect
+                if viewModel.isLoading {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Processing...")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.orange.opacity(0.1))
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                            )
+                    )
+                } else {
+                    Button("Process Repository") {
+                        viewModel.processRepository()
+                    }
+                    .buttonStyle(GlassPrimaryButtonStyle())
+                }
+                
+                // Verbose logs with glass effect
+                if !viewModel.verboseLogs.isEmpty {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 4) {
+                            ForEach(viewModel.verboseLogs, id: \.self) { log in
+                                Text(log)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(16)
+                    }
+                    .frame(height: 150)
+                    .frame(maxWidth: 500)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.black.opacity(0.05))
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                            )
+                    )
+                    .scrollIndicators(.never)
+                }
             }
+            .padding(40)
         }
-        .padding(40)
+    }
+}
+
+// MARK: - Glass Styles
+
+struct GlassTextFieldStyle: TextFieldStyle {
+    func _body(configuration: TextField<Self._Label>) -> some View {
+        configuration
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(0.08))
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                    )
+            )
+            .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 2)
+    }
+}
+
+struct GlassButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.15 : 0.1))
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                    )
+            )
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+
+struct GlassPrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 32)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.blue.opacity(configuration.isPressed ? 0.7 : 0.8),
+                                Color.blue.opacity(configuration.isPressed ? 0.5 : 0.6)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                    )
+            )
+            .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+
+struct GlassToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack {
+            configuration.label
+                .font(.system(size: 14, weight: .medium))
+            
+            Spacer()
+            
+            RoundedRectangle(cornerRadius: 12)
+                .fill(configuration.isOn ? Color.blue.opacity(0.2) : Color.gray.opacity(0.1))
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(configuration.isOn ? Color.blue.opacity(0.3) : Color.gray.opacity(0.2), lineWidth: 1)
+                )
+                .frame(width: 44, height: 24)
+                .overlay(
+                    Circle()
+                        .fill(Color.white)
+                        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                        .frame(width: 18, height: 18)
+                        .offset(x: configuration.isOn ? 8 : -8)
+                        .animation(.easeInOut(duration: 0.2), value: configuration.isOn)
+                )
+                .onTapGesture {
+                    configuration.isOn.toggle()
+                }
+        }
     }
 }
 
