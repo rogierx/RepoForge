@@ -1,0 +1,58 @@
+# GitHub to Text Electron App - Project Rules
+
+## Project Overview
+Minimal Mac Electron app that converts GitHub repositories to formatted plain text for LLM consumption (specifically Gemini 2.5 Pro).
+
+## Core Functionality Requirements
+- Input: GitHub URL + Personal Access Token
+- Generate complete file tree structure 
+- Include full content of ALL files in repository
+- Token counting using Gemini 2.5 Pro compatible method
+- Sort files/folders by token count (highest first)
+- Exclude/include functionality for files and folders
+- Copy to clipboard functionality
+
+## Output Format Requirements
+1. Directory structure first (tree format with └── │ ├── symbols)
+2. Then each file's complete content with separator format:
+   ```
+   ---
+   File: /path/to/file.ext
+   ---
+   [full file content here]
+   ```
+
+## Technical Specifications
+- Minimal UI - no extensive styling, basic functional design
+- Process ALL file types in repository
+- No file size limits (user has beefy machine)
+- Store Personal Access Token locally for convenience
+- Real-time token counting and sorting
+- GitHub API integration for fetching repository contents
+
+## User Preferences
+- Token counting compatible with Gemini 2.5 Pro
+- Ability to sort by token count to identify largest files/folders
+- Exclude functionality for large files/folders when needed
+- Minimal, functional design - no fancy styling
+- Copy button for entire output
+- No emojis in any code or UI elements
+
+## Development Guidelines
+- Use standard Electron architecture
+- Implement proper error handling for GitHub API
+- Local storage for token persistence
+- Efficient memory handling for large repositories
+- Clean, minimal code structure
+
+## Changelog
+- 2025-01-27: Initial project setup and requirements documentation
+- 2025-01-27: Completed full Electron app implementation with all core features
+  - GitHub API integration with recursive content fetching
+  - Gemini 2.5 Pro compatible token counting using cl100k_base encoding
+  - File tree generation with proper └── │ ├── formatting
+  - Token-based sorting (highest first) for files
+  - Select/deselect functionality for file filtering
+  - Output generation matching specified format
+  - Copy to clipboard functionality
+  - Local storage for Personal Access Token 
