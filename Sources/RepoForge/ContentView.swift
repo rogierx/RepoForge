@@ -277,22 +277,6 @@ struct MainInputView: View {
                 .cornerRadius(8)
                 .scrollIndicators(.never)
             }
-            
-            // Settings button with greyish background
-            Button(action: {}) {
-                HStack(spacing: 8) {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 14))
-                    Text("Settings")
-                        .font(.system(size: 14))
-                }
-                .foregroundColor(.primary)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color(.controlBackgroundColor))
-                .cornerRadius(8)
-            }
-            .buttonStyle(.plain)
         }
         .padding(40)
     }
@@ -693,6 +677,18 @@ struct ExcludeOptionsView: View {
 struct FooterView: View {
     var body: some View {
         HStack {
+            // Small Settings button in bottom left
+            Button(action: {}) {
+                HStack(spacing: 4) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 10))
+                    Text("Settings")
+                        .font(.system(size: 10))
+                }
+                .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            
             Spacer()
             
             Button(action: {

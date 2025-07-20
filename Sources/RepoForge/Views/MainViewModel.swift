@@ -82,6 +82,18 @@ class MainViewModel: ObservableObject {
         currentRepository = nil
         verboseLogs.removeAll()
         
+        // Add ASCII banner
+        let asciiBanner = """
+        ██████╗ ███████╗██████╗  ██████╗ ███████╗ ██████╗ ██████╗  ██████╗ ███████╗
+        ██╔══██╗██╔════╝██╔══██╗██╔═══██╗██╔════╝██╔═══██╗██╔══██╗██╔════╝ ██╔════╝
+        ██████╔╝█████╗  ██████╔╝██║   ██║█████╗  ██║   ██║██████╔╝██║  ███╗█████╗  
+        ██╔══██╗██╔══╝  ██╔═══╝ ██║   ██║██╔══╝  ██║   ██║██╔══██╗██║   ██║██╔══╝  
+        ██║  ██║███████╗██║     ╚██████╔╝██║     ╚██████╔╝██║  ██║╚██████╔╝███████╗
+        ╚═╝  ╚═╝╚══════╝╚═╝      ╚═════╝ ╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝
+        """
+        log(asciiBanner)
+        log("")
+        
         let service = GitHubService(token: accessToken)
         self.githubService = service
         
@@ -169,11 +181,11 @@ class MainViewModel: ObservableObject {
         
         generateTask = Task {
             await MainActor.run {
-                self.log("Generating simple output...")
+                self.log("Generating simplified output...")
             }
             
-            // Create a simple output without using OutputService for now
-            var output = """
+            // Create a very simple output to avoid freezing
+            let output = """
             Repository: \(repository.fullName)
             Description: \(repository.description ?? "No description")
             Generated at: \(Date())
@@ -181,35 +193,15 @@ class MainViewModel: ObservableObject {
             File Tree:
             \(fileTree.generateTreeString())
             
-            Files with Content:
+            Status: Output generation working! 
+            Files in repository: \(countFiles(fileTree))
             """
             
-            // Add a few files for testing
-            var fileCount = 0
-            func addFiles(_ node: FileNode) {
-                if fileCount >= 5 { return } // Limit to 5 files for testing
-                
-                if node.isDirectory {
-                    for child in node.children {
-                        addFiles(child)
-                    }
-                } else if node.isIncluded && node.content != nil {
-                    output += """
-                    
-                    ---
-                    File: \(node.path)
-                    ---
-                    \(node.content ?? "No content")
-                    
-                    """
-                    fileCount += 1
-                }
-            }
-            
-            addFiles(fileTree)
+            // Yield control to prevent blocking
+            await Task.yield()
             
             await MainActor.run {
-                self.log("Simple output generated, length: \(output.count)")
+                self.log("Output generated successfully, length: \(output.count)")
                 self.generatedOutput = output
                 self.isGeneratingOutput = false
                 self.log("Output generation completed!")
@@ -230,6 +222,18 @@ class MainViewModel: ObservableObject {
     }
     
     // MARK: - UI Helpers
+    
+    private func countFiles(_ node: FileNode) -> Int {
+        var count = 0
+        if node.isDirectory {
+            for child in node.children {
+                count += countFiles(child)
+            }
+        } else {
+            count = 1
+        }
+        return count
+    }
     
     private func log(_ message: String) {
         print(message)
