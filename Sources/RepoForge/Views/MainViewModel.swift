@@ -355,33 +355,125 @@ class MainViewModel: ObservableObject {
         let url = URL(fileURLWithPath: path)
         let rootNode = FileNode(name: url.lastPathComponent, path: path, type: .directory)
         
-        try await processLocalDirectory(url: url, node: rootNode)
+        // Use visited paths to prevent infinite loops from symlinks
+        var visitedPaths = Set<String>()
+        try await processLocalDirectory(url: url, node: rootNode, visitedPaths: &visitedPaths, depth: 0)
+        
+        // Estimate token counts without loading content
+        estimateTokenCounts(for: rootNode)
+        
         return rootNode
     }
     
-    private func processLocalDirectory(url: URL, node: FileNode) async throws {
-        let fileManager = FileManager.default
-        let contents = try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles])
+    private func processLocalDirectory(url: URL, node: FileNode, visitedPaths: inout Set<String>, depth: Int) async throws {
+        // Safety checks
+        guard depth < 50 else { 
+            log("⚠️ Max recursion depth reached for: \(url.path)")
+            return 
+        }
         
-        for itemURL in contents {
-            let resourceValues = try itemURL.resourceValues(forKeys: [.isDirectoryKey])
-            let isDirectory = resourceValues.isDirectory ?? false
+        guard !Task.isCancelled else { return }
+        
+        // Prevent infinite loops from symlinks
+        let canonicalPath = url.resolvingSymlinksInPath().path
+        guard !visitedPaths.contains(canonicalPath) else {
+            log("⚠️ Symlink loop detected, skipping: \(url.path)")
+            return
+        }
+        visitedPaths.insert(canonicalPath)
+        
+        let fileManager = FileManager.default
+        
+        do {
+            let contents = try fileManager.contentsOfDirectory(
+                at: url, 
+                includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .isSymbolicLinkKey], 
+                options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
+            )
             
-            let fileType: FileNode.FileType = isDirectory ? .directory : .file
-            let childNode = FileNode(name: itemURL.lastPathComponent, path: itemURL.path, type: fileType)
-            node.children.append(childNode)
-            
-            if isDirectory {
-                try await processLocalDirectory(url: itemURL, node: childNode)
-            } else {
-                // Read file content and count tokens
-                if let content = try? String(contentsOf: itemURL) {
-                    childNode.content = content
-                    let tokenCount = tokenService.countTokens(in: content)
-                    childNode.addTokens(tokenCount)
+            for itemURL in contents {
+                guard !Task.isCancelled else { return }
+                
+                let resourceValues = try itemURL.resourceValues(forKeys: [
+                    .isDirectoryKey, 
+                    .fileSizeKey, 
+                    .isSymbolicLinkKey
+                ])
+                
+                let isDirectory = resourceValues.isDirectory ?? false
+                let isSymlink = resourceValues.isSymbolicLink ?? false
+                let fileSize = resourceValues.fileSize ?? 0
+                let fileName = itemURL.lastPathComponent
+                
+                // Skip dangerous directories and files
+                if shouldSkipPath(fileName, isDirectory: isDirectory) {
+                    log("⏭️ Skipping: \(fileName)")
+                    continue
+                }
+                
+                let fileType: FileNode.FileType = isSymlink ? .symlink : (isDirectory ? .directory : .file)
+                let childNode = FileNode(name: fileName, path: itemURL.path, type: fileType, size: fileSize)
+                node.children.append(childNode)
+                
+                if isDirectory && !isSymlink {
+                    // Only recurse into real directories, not symlinks
+                    try await processLocalDirectory(url: itemURL, node: childNode, visitedPaths: &visitedPaths, depth: depth + 1)
+                } else if !isDirectory {
+                    // DON'T load content here - do it lazily during output generation
+                    // Just estimate tokens based on file size
+                    let estimatedTokens = max(1, Int(ceil(Double(fileSize) / 4.0)))
+                    childNode.tokenCount = estimatedTokens
+                    childNode.totalTokenCount = estimatedTokens
+                }
+                
+                // Yield control periodically to prevent UI freezing
+                if depth == 0 && node.children.count % 100 == 0 {
+                    await Task.yield()
+                    log("📁 Processed \(node.children.count) items in root directory...")
                 }
             }
+        } catch {
+            log("⚠️ Error reading directory \(url.path): \(error.localizedDescription)")
         }
+        
+        // Remove from visited paths when exiting (for sibling directories)
+        visitedPaths.remove(canonicalPath)
+    }
+    
+    private func shouldSkipPath(_ name: String, isDirectory: Bool) -> Bool {
+        let lowerName = name.lowercased()
+        
+        // Skip common problematic directories
+        let skipDirs = [
+            "node_modules", ".git", ".svn", ".hg", ".bzr",
+            "build", "dist", "target", "bin", "obj",
+            ".gradle", ".maven", ".cargo", ".tox",
+            "venv", ".venv", "env", ".env", "__pycache__",
+            ".pytest_cache", ".mypy_cache", ".coverage",
+            "vendor", "deps", "packages", ".nuget",
+            ".vs", ".vscode", ".idea", ".eclipse",
+            "Pods", "DerivedData", ".xcode",
+            "tmp", "temp", "cache", ".cache",
+            "logs", "log", ".DS_Store"
+        ]
+        
+        if isDirectory && skipDirs.contains(lowerName) {
+            return true
+        }
+        
+        // Skip large binary files and problematic files
+        let skipExtensions = [
+            ".exe", ".dll", ".so", ".dylib", ".a", ".lib",
+            ".zip", ".tar", ".gz", ".rar", ".7z",
+            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".ico",
+            ".mp4", ".avi", ".mov", ".mkv", ".wmv",
+            ".mp3", ".wav", ".flac", ".ogg",
+            ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+            ".sqlite", ".db", ".mdb",
+            ".min.js", ".min.css"
+        ]
+        
+        return skipExtensions.contains { lowerName.hasSuffix($0) }
     }
     
     private func processGitHubFiles(_ filesToProcess: [FileNode], repository: Repository, outputParts: inout [String]) async {
@@ -422,16 +514,32 @@ class MainViewModel: ObservableObject {
     }
     
     private func processLocalFiles(_ filesToProcess: [FileNode], outputParts: inout [String]) async {
-        for node in filesToProcess {
+        for (index, node) in filesToProcess.enumerated() {
             if Task.isCancelled { break }
             
-            let content = node.content ?? {
-                if let loadedContent = try? String(contentsOfFile: node.path) {
-                    return loadedContent
-                } else {
-                    return "// Error loading local file content"
+            // Update progress
+            if index % 10 == 0 {
+                await MainActor.run {
+                    self.log("Processing local file \(index + 1)/\(filesToProcess.count): \(node.name)")
                 }
-            }()
+            }
+            
+            // Load content lazily - only when generating output
+            let content: String
+            if let existingContent = node.content {
+                content = existingContent
+            } else {
+                // Safely load file content with size limits
+                content = await loadLocalFileContent(path: node.path, maxSize: 10_000_000) // 10MB limit
+                
+                // Count tokens and update node
+                let tokenCount = tokenService.countTokens(in: content)
+                await MainActor.run {
+                    node.content = content
+                    node.tokenCount = tokenCount
+                    node.totalTokenCount = tokenCount
+                }
+            }
             
             let fileSection = """
             ---
@@ -442,6 +550,40 @@ class MainViewModel: ObservableObject {
             """
             outputParts.append(fileSection)
         }
+    }
+    
+    private func loadLocalFileContent(path: String, maxSize: Int) async -> String {
+        return await Task.detached {
+            do {
+                let url = URL(fileURLWithPath: path)
+                
+                // Check file size first
+                let attributes = try FileManager.default.attributesOfItem(atPath: path)
+                if let fileSize = attributes[.size] as? Int64, fileSize > maxSize {
+                    return "// File too large (\(fileSize) bytes) - skipped for performance"
+                }
+                
+                // Check if file is likely binary
+                let data = try Data(contentsOf: url)
+                if data.isEmpty {
+                    return "// Empty file"
+                }
+                
+                // Simple binary check - if more than 5% non-printable chars, treat as binary
+                let printableCount = data.filter { char in
+                    return char >= 32 && char <= 126 || char == 9 || char == 10 || char == 13
+                }.count
+                
+                if Double(printableCount) / Double(data.count) < 0.95 {
+                    return "// Binary file - content not included"
+                }
+                
+                return String(data: data, encoding: .utf8) ?? "// Could not decode file as UTF-8"
+                
+            } catch {
+                return "// Error loading file: \(error.localizedDescription)"
+            }
+        }.value
     }
     
     private func showError(_ message: String) {
