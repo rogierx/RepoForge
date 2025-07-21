@@ -188,6 +188,38 @@ class PersistenceService: ObservableObject {
     func setShouldAutoExcludeLargeFiles(_ should: Bool) {
         userDefaults.set(should, forKey: "autoExcludeLargeFiles")
     }
+    
+    // MARK: - Sidebar Features Persistence
+    
+    func saveRecents(_ recents: [String]) {
+        userDefaults.set(recents, forKey: "recent-repositories")
+    }
+    
+    func loadRecents() -> [String] {
+        return userDefaults.array(forKey: "recent-repositories") as? [String] ?? []
+    }
+    
+    func saveBookmarks(_ bookmarks: [String]) {
+        userDefaults.set(bookmarks, forKey: "bookmarked-repositories")
+    }
+    
+    func loadBookmarks() -> [String] {
+        return userDefaults.array(forKey: "bookmarked-repositories") as? [String] ?? []
+    }
+    
+    func saveSavedOutputs(_ outputs: [SavedOutput]) {
+        if let data = try? JSONEncoder().encode(outputs) {
+            userDefaults.set(data, forKey: "saved-outputs")
+        }
+    }
+    
+    func loadSavedOutputs() -> [SavedOutput] {
+        guard let data = userDefaults.data(forKey: "saved-outputs"),
+              let outputs = try? JSONDecoder().decode([SavedOutput].self, from: data) else {
+            return []
+        }
+        return outputs
+    }
 }
 
 // MARK: - Supporting Data Structures

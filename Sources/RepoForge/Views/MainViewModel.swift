@@ -9,6 +9,24 @@ import Foundation
 import SwiftUI
 import Combine
 
+struct SavedOutput: Identifiable, Codable {
+    let id: UUID
+    let name: String
+    let content: String
+    let fileCount: Int
+    let tokenCount: Int
+    let createdAt: Date
+    
+    init(name: String, content: String, fileCount: Int, tokenCount: Int, createdAt: Date) {
+        self.id = UUID()
+        self.name = name
+        self.content = content
+        self.fileCount = fileCount
+        self.tokenCount = tokenCount
+        self.createdAt = createdAt
+    }
+}
+
 @MainActor
 class MainViewModel: ObservableObject {
     
@@ -38,6 +56,11 @@ class MainViewModel: ObservableObject {
     @Published var selectedTab = 0
     @Published var verboseLogs: [String] = []
     
+    // MARK: - Sidebar Features
+    @Published var recentRepositories: [String] = []
+    @Published var bookmarkedRepositories: [String] = []
+    @Published var savedOutputs: [SavedOutput] = []
+    
     // MARK: - Services
     
     private var githubService: GitHubService?
@@ -62,6 +85,11 @@ class MainViewModel: ObservableObject {
         self.accessToken = persistenceService.retrieveGitHubToken() ?? ""
         if !githubURL.isEmpty { self.saveURL = true }
         if !accessToken.isEmpty { self.saveToken = true }
+        
+        // Load sidebar data
+        self.recentRepositories = persistenceService.loadRecents()
+        self.bookmarkedRepositories = persistenceService.loadBookmarks()
+        self.savedOutputs = persistenceService.loadSavedOutputs()
     }
     
     // MARK: - Core Logic
@@ -124,6 +152,7 @@ class MainViewModel: ObservableObject {
                         self.fileTree = rootNode
                         self.isLoading = false // Stop loading indicator HERE
                         self.selectedTab = 1   // Switch to the file tree view
+                        self.addToRecents(self.githubURL) // Add to recents
                     }
                     
                 } catch {
@@ -168,6 +197,7 @@ class MainViewModel: ObservableObject {
                         self.fileTree = rootNode
                         self.isLoading = false
                         self.selectedTab = 1
+                        self.addToRecents(self.localPath) // Add to recents
                     }
                     
                 } catch {
@@ -417,5 +447,106 @@ class MainViewModel: ObservableObject {
     private func showError(_ message: String) {
         errorMessage = message
         log("ERROR: \(message)")
+    }
+    
+    // MARK: - Sidebar Functionality
+    
+    func loadRecentRepository(_ repoPath: String) {
+        if repoPath.hasPrefix("http") {
+            // GitHub URL
+            githubURL = repoPath
+            repoType = .github
+        } else {
+            // Local path
+            localPath = repoPath
+            repoType = .local
+        }
+        selectedTab = 0 // Switch to Main tab
+    }
+    
+    func addBookmark(_ repoName: String) {
+        if !bookmarkedRepositories.contains(repoName) {
+            bookmarkedRepositories.append(repoName)
+            persistenceService.saveBookmarks(bookmarkedRepositories)
+        }
+    }
+    
+    func removeBookmark(_ repoName: String) {
+        bookmarkedRepositories.removeAll { $0 == repoName }
+        persistenceService.saveBookmarks(bookmarkedRepositories)
+    }
+    
+    func loadBookmarkedRepository(_ repoName: String) {
+        githubURL = "https://github.com/\(repoName)"
+        repoType = .github
+        selectedTab = 0 // Switch to Main tab
+    }
+    
+    func saveCurrentOutput() {
+        guard let repository = currentRepository, !generatedOutput.isEmpty else { return }
+        
+        let fileCount = countSelectedFiles(fileTree)
+        let tokenCount = calculateTotalTokens(fileTree)
+        
+        let savedOutput = SavedOutput(
+            name: repository.fullName,
+            content: generatedOutput,
+            fileCount: fileCount,
+            tokenCount: tokenCount,
+            createdAt: Date()
+        )
+        
+        savedOutputs.append(savedOutput)
+        persistenceService.saveSavedOutputs(savedOutputs)
+        log("Output saved: \(repository.fullName)")
+    }
+    
+    func loadSavedOutput(_ savedOutput: SavedOutput) {
+        generatedOutput = savedOutput.content
+        selectedTab = 2 // Switch to Output tab
+    }
+    
+    func deleteSavedOutput(_ savedOutput: SavedOutput) {
+        savedOutputs.removeAll { $0.id == savedOutput.id }
+        persistenceService.saveSavedOutputs(savedOutputs)
+    }
+    
+    private func countSelectedFiles(_ node: FileNode?) -> Int {
+        guard let node = node else { return 0 }
+        var count = 0
+        if node.isDirectory {
+            for child in node.children {
+                count += countSelectedFiles(child)
+            }
+        } else if node.isIncluded {
+            count = 1
+        }
+        return count
+    }
+    
+    private func calculateTotalTokens(_ node: FileNode?) -> Int {
+        guard let node = node else { return 0 }
+        var total = 0
+        if node.isDirectory {
+            for child in node.children {
+                total += calculateTotalTokens(child)
+            }
+        } else if node.isIncluded {
+            total += node.tokenCount
+        }
+        return total
+    }
+    
+    private func addToRecents(_ repoPath: String) {
+        // Remove if already exists and add to front
+        recentRepositories.removeAll { $0 == repoPath }
+        recentRepositories.insert(repoPath, at: 0)
+        
+        // Keep only last 10 items
+        if recentRepositories.count > 10 {
+            recentRepositories = Array(recentRepositories.prefix(10))
+        }
+        
+        persistenceService.saveRecents(recentRepositories)
     }
 } 
