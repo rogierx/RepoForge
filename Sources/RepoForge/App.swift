@@ -8,27 +8,38 @@ struct RepoForgeApp: App {
         WindowGroup {
             ContentView()
         }
-        .windowStyle(.titleBar)
         .windowResizability(.contentSize)
         .defaultSize(width: 900, height: 600)
+        .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("About repoforge") {
+                    NSApplication.shared.orderFrontStandardAboutPanel(
+                        options: [
+                            NSApplication.AboutPanelOptionKey.applicationName: "repoforge",
+                            NSApplication.AboutPanelOptionKey.applicationVersion: "1.0"
+                        ]
+                    )
+                }
+            }
+        }
     }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Ensure single instance
         ensureSingleInstance()
         
-        // Set the app icon - try appicon.png first, then fall back to AppIcon.icns
         Task { @MainActor in
             setAppIcon()
             
-            // Bring app to front and focus
             NSApp.setActivationPolicy(.regular)
             NSApp.activate(ignoringOtherApps: true)
             
-            // Make sure app appears in dock
             if let window = NSApp.windows.first {
+                window.title = ""
+                window.titleVisibility = .hidden
+                window.titlebarAppearsTransparent = true
+                window.styleMask.insert(.fullSizeContentView)
                 window.makeKeyAndOrderFront(nil)
             }
         }
@@ -44,7 +55,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return app.bundleIdentifier?.contains("RepoForge") == true && app.processIdentifier != NSRunningApplication.current.processIdentifier
         }
         
-        // Terminate other instances
         for app in repoForgeApps {
             app.terminate()
         }
@@ -54,7 +64,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setAppIcon() {
         var iconSet = false
         
-        // Try appicon.png from the workspace root (when running from source)
         let workspaceURL = Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent()
         let appiconURL = workspaceURL.appendingPathComponent("appicon.png")
         
@@ -66,7 +75,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         
-        // Fallback to bundled AppIcon.icns
         if !iconSet, let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "icns") {
             if let icon = NSImage(contentsOfFile: iconPath) {
                 NSApp.applicationIconImage = icon
@@ -74,7 +82,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         
-        // Additional fallback - try appicon.png from current directory
         if !iconSet {
             let currentDirIcon = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("appicon.png")
             if FileManager.default.fileExists(atPath: currentDirIcon.path) {

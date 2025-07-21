@@ -5,7 +5,6 @@ struct FileTreeView: View {
     @State private var isExpanded = true
     private let level: Int
     
-    // Using a simple let for the service now.
     let tokenService: TokenCountingService
 
     init(fileNode: FileNode, level: Int = 0, tokenService: TokenCountingService) {
@@ -36,29 +35,24 @@ struct FileRow: View {
 
     var body: some View {
         HStack {
-            // Indentation
             Spacer().frame(width: CGFloat(level * 20))
 
-            // Icon
             Image(systemName: fileNode.isDirectory ? "folder.fill" : "doc.text.fill")
-                .foregroundColor(fileNode.isDirectory ? .blue : .gray)
+                .foregroundColor(fileNode.isDirectory ? .secondary : .secondary)
 
-            // File Name
             Text(fileNode.name)
                 .lineLimit(1)
             
             Spacer()
 
-            // Inclusion checkbox
             Button(action: {
                 fileNode.updateInclusion(isIncluded: !fileNode.isIncluded, includeChildren: true)
             }) {
                 Image(systemName: fileNode.isIncluded ? "checkmark.square" : "square")
-                    .foregroundStyle(fileNode.isIncluded ? .blue : .secondary)
+                    .foregroundStyle(fileNode.isIncluded ? .black : .secondary)
             }
             .buttonStyle(PlainButtonStyle())
 
-            // Token/File Count
             Text(formattedCount)
                 .font(.caption)
                 .foregroundColor(.secondary)

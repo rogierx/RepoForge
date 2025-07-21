@@ -3,10 +3,8 @@ import Foundation
 class PersistenceService: ObservableObject {
     private let userDefaults = UserDefaults.standard
     
-    // MARK: - GitHub Token Management (UserDefaults - Session Only)
     
     func storeGitHubToken(_ token: String) {
-        // Store in UserDefaults for this session - much simpler and less scary
         userDefaults.set(token, forKey: "github-token")
     }
     
@@ -18,7 +16,6 @@ class PersistenceService: ObservableObject {
         userDefaults.removeObject(forKey: "github-token")
     }
     
-    // GitHub URL Storage
     func storeGitHubURL(_ url: String) {
         userDefaults.set(url, forKey: "github-url")
     }
@@ -31,18 +28,14 @@ class PersistenceService: ObservableObject {
         userDefaults.removeObject(forKey: "github-url")
     }
     
-    // MARK: - User Preferences
     
     func storeRecentRepository(_ repo: RecentRepository) {
         var recentRepos = getRecentRepositories()
         
-        // Remove if already exists
-        recentRepos.removeAll { $0.fullName == repo.fullName }
+        recentRepos.removeAll { $0.path == repo.path }
         
-        // Add to beginning
         recentRepos.insert(repo, at: 0)
         
-        // Keep only last 10
         recentRepos = Array(recentRepos.prefix(10))
         
         do {
@@ -69,13 +62,10 @@ class PersistenceService: ObservableObject {
     func storeBookmark(_ bookmark: Bookmark) {
         var bookmarks = getBookmarks()
         
-        // Remove if already exists
         bookmarks.removeAll { $0.fullName == bookmark.fullName }
         
-        // Add new bookmark
         bookmarks.append(bookmark)
         
-        // Sort by name
         bookmarks.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         
         do {
@@ -111,18 +101,14 @@ class PersistenceService: ObservableObject {
         }
     }
     
-    // MARK: - Output Bookmark Management
     
     func storeOutputBookmark(_ bookmark: OutputBookmark) {
         var bookmarks = getOutputBookmarks()
         
-        // Remove if already exists (by repository name and creation time)
         bookmarks.removeAll { $0.repositoryName == bookmark.repositoryName && Calendar.current.isDate($0.createdAt, equalTo: bookmark.createdAt, toGranularity: .minute) }
         
-        // Add to beginning
         bookmarks.insert(bookmark, at: 0)
         
-        // Keep only last 20 bookmarks
         bookmarks = Array(bookmarks.prefix(20))
         
         do {
@@ -158,7 +144,6 @@ class PersistenceService: ObservableObject {
         }
     }
     
-    // MARK: - App Preferences
     
     func getExcludePatterns() -> [String] {
         return userDefaults.stringArray(forKey: "excludePatterns") ?? [
@@ -174,7 +159,7 @@ class PersistenceService: ObservableObject {
     
     func getMaxTokensPerFile() -> Int {
         let value = userDefaults.integer(forKey: "maxTokensPerFile")
-        return value > 0 ? value : 50000 // Default 50K tokens
+        return value > 0 ? value : 50000
     }
     
     func setMaxTokensPerFile(_ maxTokens: Int) {
@@ -189,14 +174,19 @@ class PersistenceService: ObservableObject {
         userDefaults.set(should, forKey: "autoExcludeLargeFiles")
     }
     
-    // MARK: - Sidebar Features Persistence
     
-    func saveRecents(_ recents: [String]) {
-        userDefaults.set(recents, forKey: "recent-repositories")
+    func saveRecents(_ recents: [RecentRepository]) {
+        if let data = try? JSONEncoder().encode(recents) {
+            userDefaults.set(data, forKey: "recent-repositories")
+        }
     }
     
-    func loadRecents() -> [String] {
-        return userDefaults.array(forKey: "recent-repositories") as? [String] ?? []
+    func loadRecents() -> [RecentRepository] {
+        guard let data = userDefaults.data(forKey: "recent-repositories"),
+              let recents = try? JSONDecoder().decode([RecentRepository].self, from: data) else {
+            return []
+        }
+        return recents
     }
     
     func saveBookmarks(_ bookmarks: [String]) {
@@ -219,22 +209,6 @@ class PersistenceService: ObservableObject {
             return []
         }
         return outputs
-    }
-}
-
-// MARK: - Supporting Data Structures
-
-struct RecentRepository: Codable, Identifiable {
-    let id = UUID()
-    let name: String
-    let fullName: String
-    let url: String
-    let description: String?
-    let language: String?
-    let lastAccessed: Date
-    
-    enum CodingKeys: String, CodingKey {
-        case name, fullName, url, description, language, lastAccessed
     }
 }
 

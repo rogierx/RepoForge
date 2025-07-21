@@ -1,6 +1,5 @@
 import Foundation
 
-// MARK: - Core API Models
 
 struct Repository: Codable, Identifiable {
     let id: Int
@@ -47,7 +46,6 @@ struct RepositoryContent: Codable {
         guard let content = content, let encoding = encoding else { return nil }
         
         if encoding == "base64" {
-            // Remove any whitespace and newlines from the base64 string
             let cleanedContent = content.replacingOccurrences(of: "\\s", with: "", options: .regularExpression)
             guard let data = Data(base64Encoded: cleanedContent) else { return nil }
             return String(data: data, encoding: .utf8)
@@ -67,21 +65,18 @@ struct GitTreeEntry: Codable {
     let size: Int?
 }
 
-// MARK: - API Error Handling
 
 struct GitHubAPIError: Error, Codable {
     let message: String
     let documentation_url: String?
     
-    // Adding statusCode to be able to handle it, but it's not in the JSON response.
     var statusCode: Int?
 }
 
-// MARK: - API Configuration & Rate Limiting
 
 struct GitHubAPIConfig {
     let token: String
-    let baseURL = "https://api.github.com"
+    let baseURL = "https:
 }
 
 struct GitHubRateLimit: Codable {
@@ -91,7 +86,6 @@ struct GitHubRateLimit: Codable {
     let used: Int
 }
 
-// MARK: - URL Parsing Utility
 
 struct GitHubURL {
     let owner: String

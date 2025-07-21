@@ -24,7 +24,7 @@ struct AppLogoView: View {
             ██║     ╚██████╔╝██║  ██║╚██████╔╝███████╗
             ╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝
             """)
-            .font(.system(size: 7, weight: .medium, design: .monospaced))
+            .font(.system(size: 8.75, weight: .medium, design: .monospaced))
             .foregroundColor(.primary)
             .multilineTextAlignment(.center)
             .lineLimit(nil)
@@ -33,12 +33,45 @@ struct AppLogoView: View {
     }
 }
 
+struct RecentsASCIIView: View {
+    var body: some View {
+        Text("""
+        ██████╗ ███████╗ ██████╗███████╗███╗   ██╗████████╗███████╗
+        ██╔══██╗██╔════╝██╔════╝██╔════╝████╗  ██║╚══██╔══╝██╔════╝
+        ██████╔╝█████╗  ██║     █████╗  ██╔██╗ ██║   ██║   ███████╗
+        ██╔══██╗██╔══╝  ██║     ██╔══╝  ██║╚██╗██║   ██║   ╚════██║
+        ██║  ██║███████╗╚██████╗███████╗██║ ╚████║   ██║   ███████║
+        ╚═╝  ╚═╝╚══════╝ ╚═════╝╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚══════╝
+        """)
+        .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+        .foregroundColor(.primary)
+        .multilineTextAlignment(.center)
+        .lineLimit(nil)
+    }
+}
+
+struct BookmarksASCIIView: View {
+    var body: some View {
+        Text("""
+        ██████╗  ██████╗  ██████╗ ██╗  ██╗███╗   ███╗ █████╗ ██████╗ ██╗  ██╗███████╗
+        ██╔══██╗██╔═══██╗██╔═══██╗██║ ██╔╝████╗ ████║██╔══██╗██╔══██╗██║ ██╔╝██╔════╝
+        ██████╔╝██║   ██║██║   ██║█████╔╝ ██╔████╔██║███████║██████╔╝█████╔╝ ███████╗
+        ██╔══██╗██║   ██║██║   ██║██╔═██╗ ██║╚██╔╝██║██╔══██║██╔══██╗██╔═██╗ ╚════██║
+        ██████╔╝╚██████╔╝╚██████╔╝██║  ██╗██║ ╚═╝ ██║██║  ██║██║  ██║██║  ██╗███████║
+        ╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝
+        """)
+        .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+        .foregroundColor(.primary)
+        .multilineTextAlignment(.center)
+        .lineLimit(nil)
+    }
+}
+
 #Preview {
     VStack(spacing: 20) {
         AppLogoView(size: 32)
-        AppLogoView(size: 48)
-        AppLogoView(size: 64)
-        AppLogoView(size: 128)
+        RecentsASCIIView()
+        BookmarksASCIIView()
     }
     .padding()
 } 

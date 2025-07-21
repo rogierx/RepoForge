@@ -1,15 +1,7 @@
-//
-//  FileNode.swift
-//  RepoForge
-//
-//  Created by Rogier on 2025-07-18.
-//
 
 import Foundation
 import UniformTypeIdentifiers
 
-// Using @unchecked Sendable because the class is not final and has mutable properties,
-// but we will ensure thread-safe access in practice.
 class FileNode: Identifiable, ObservableObject, Hashable, @unchecked Sendable {
     let id = UUID()
     let name: String
@@ -21,12 +13,9 @@ class FileNode: Identifiable, ObservableObject, Hashable, @unchecked Sendable {
     @Published var isIncluded = true
     @Published var content: String?
     
-    // DRASTIC OPTIMIZATION: Use stored properties to prevent re-computation.
-    // These are now updated incrementally.
     @Published var totalFileCount: Int
     @Published var totalTokenCount: Int
     
-    // This is now a simple stored property.
     @Published var tokenCount: Int = 0
     
     weak var parent: FileNode?
@@ -40,7 +29,6 @@ class FileNode: Identifiable, ObservableObject, Hashable, @unchecked Sendable {
     }
     
     var category: FileTypeCategories.Category {
-        // Correctly access the singleton instance.
         return FileTypeCategories.shared.category(for: name)
     }
 
@@ -51,28 +39,22 @@ class FileNode: Identifiable, ObservableObject, Hashable, @unchecked Sendable {
         self.size = size
         self.content = content
         
-        // Initialize counts.
         self.totalFileCount = (type == .file) ? 1 : 0
         self.tokenCount = 0
         self.totalTokenCount = 0
     }
     
-    // This method should now only be called from a background thread during tree construction.
     func addChild(_ node: FileNode) {
         children.append(node)
         node.parent = self
         
-        // Update counts incrementally. This is safe because it's run synchronously
-        // on a background thread before the UI ever sees the node.
         self.totalFileCount += node.totalFileCount
         self.totalTokenCount += node.totalTokenCount
     }
     
-    // Used to propagate token count updates up the tree from a background thread.
     func addTokens(_ count: Int) {
         self.tokenCount += count
         
-        // Propagate the change up the parent chain.
         var current = self
         while let parent = current.parent {
             parent.totalTokenCount += count
@@ -81,7 +63,6 @@ class FileNode: Identifiable, ObservableObject, Hashable, @unchecked Sendable {
     }
 
 
-    // MARK: - Hashing and Equality for Tree
     
     static func == (lhs: FileNode, rhs: FileNode) -> Bool {
         return lhs.id == rhs.id
@@ -91,7 +72,6 @@ class FileNode: Identifiable, ObservableObject, Hashable, @unchecked Sendable {
         hasher.combine(id)
     }
     
-    // MARK: - Tree Operations
 
     func generateTreeString(prefix: String = "") -> String {
         var result = "\(prefix)\(name)\n"
@@ -108,7 +88,6 @@ class FileNode: Identifiable, ObservableObject, Hashable, @unchecked Sendable {
     }
 
     func sort(by option: SortOption, ascending: Bool) {
-        // Sort children recursively
         for child in children {
             if child.isDirectory {
                 child.sort(by: option, ascending: ascending)
@@ -123,7 +102,6 @@ class FileNode: Identifiable, ObservableObject, Hashable, @unchecked Sendable {
             case .size:
                 result = node1.size < node2.size
             case .tokens:
-                // Now uses the stored property for efficiency.
                 result = node1.totalTokenCount < node2.totalTokenCount
             }
             return ascending ? result : !result
@@ -134,9 +112,7 @@ class FileNode: Identifiable, ObservableObject, Hashable, @unchecked Sendable {
         case name, size, tokens
     }
     
-    // MARK: - Inclusion Logic
     
-    // This logic needs to be carefully managed to ensure counts are updated correctly.
     func updateInclusion(isIncluded: Bool, includeChildren: Bool) {
         self.isIncluded = isIncluded
         if includeChildren {
@@ -144,27 +120,25 @@ class FileNode: Identifiable, ObservableObject, Hashable, @unchecked Sendable {
                 child.updateInclusion(isIncluded: isIncluded, includeChildren: true)
             }
         }
-        // Recalculating from the top is the safest way to handle inclusion changes.
         var root = self
         while let parent = root.parent {
             root = parent
         }
         root.recalculateCounts()
+        
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: NSNotification.Name("FileNodeChanged"), object: nil)
+        }
     }
     
-    // Recalculates all counts from scratch. Should be used sparingly, e.g., after
-    // a user manually changes the inclusion status of nodes.
     func recalculateCounts() {
         if isDirectory {
-            // First, have all children recalculate their counts.
             for child in children {
                 child.recalculateCounts()
             }
-            // Now, sum up the counts from the children.
             totalFileCount = children.reduce(0) { $0 + ($1.isIncluded ? $1.totalFileCount : 0) }
             totalTokenCount = children.reduce(0) { $0 + ($1.isIncluded ? $1.totalTokenCount : 0) }
         } else {
-            // For a file, the counts are simple.
             totalFileCount = 1
             totalTokenCount = tokenCount
         }

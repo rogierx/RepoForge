@@ -25,9 +25,6 @@ struct ContentView: View {
 
 struct SidebarView: View {
     @ObservedObject var viewModel: MainViewModel
-    @State private var showingRecents = false
-    @State private var showingBookmarks = false
-    @State private var showingOutputBookmarks = false
     @State private var showingSettings = false
     
     var body: some View {
@@ -36,52 +33,50 @@ struct SidebarView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Minimized sidebar with only icons
                 VStack(spacing: 20) {
-                    // Recent icon
                     Button(action: {
-                        showingRecents = true
+                        viewModel.activePage = .main
+                    }) {
+                        Image(systemName: "house")
+                            .font(.system(size: 16))
+                            .foregroundColor(viewModel.activePage == .main ? .black : .secondary)
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button(action: {
+                        viewModel.activePage = .recents
                     }) {
                         Image(systemName: "clock")
                             .font(.system(size: 16))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(viewModel.activePage == .recents ? .black : .secondary)
                     }
                     .buttonStyle(.plain)
-                    .popover(isPresented: $showingRecents) {
-                        RecentsView(viewModel: viewModel)
-                    }
                     
-                    // Bookmarks icon  
                     Button(action: {
-                        showingBookmarks = true
+                        viewModel.activePage = .bookmarks
+                        viewModel.resetNewBookmarksCount()
                     }) {
-                        Image(systemName: "bookmark")
-                            .font(.system(size: 16))
-                            .foregroundColor(.secondary)
+                        ZStack {
+                            Image(systemName: "bookmark")
+                                .font(.system(size: 16))
+                                .foregroundColor(viewModel.activePage == .bookmarks ? .black : .secondary)
+                            
+                            if viewModel.newBookmarksCount > 0 {
+                                Text("\(viewModel.newBookmarksCount)")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(minWidth: 12, minHeight: 12)
+                                    .background(Circle().fill(Color.red))
+                                    .offset(x: 8, y: -8)
+                            }
+                        }
                     }
                     .buttonStyle(.plain)
-                    .popover(isPresented: $showingBookmarks) {
-                        BookmarksView(viewModel: viewModel)
-                    }
-                    
-                    // Output bookmarks icon
-                    Button(action: {
-                        showingOutputBookmarks = true
-                    }) {
-                        Image(systemName: "doc.badge.plus")
-                            .font(.system(size: 16))
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .popover(isPresented: $showingOutputBookmarks) {
-                        OutputBookmarksView(viewModel: viewModel)
-                    }
                 }
                 .padding(.top, 20)
                 
                 Spacer()
                 
-                // Settings icon at bottom
                 VStack(spacing: 16) {
                     Button(action: {
                         showingSettings = true
@@ -217,59 +212,59 @@ struct OutputBookmarksSection: View {
 
 struct DetailView: View {
     @ObservedObject var viewModel: MainViewModel
-    @State private var selectedDetailTab = "Main"
     
     var body: some View {
         VStack(spacing: 0) {
-            // Tab buttons at the top
-            HStack(spacing: 0) {
-                TabButton(title: "Main", isSelected: selectedDetailTab == "Main") {
-                    selectedDetailTab = "Main"
+            if [.main, .fileTree, .output].contains(viewModel.activePage) {
+                HStack(spacing: 0) {
+                    Spacer()
+                    
+                    TabButton(title: "Main", isSelected: viewModel.activePage == .main) {
+                        viewModel.activePage = .main
+                    }
+                    TabButton(title: "File Tree", isSelected: viewModel.activePage == .fileTree) {
+                        viewModel.activePage = .fileTree
+                    }
+                    TabButton(title: "Output", isSelected: viewModel.activePage == .output) {
+                        viewModel.activePage = .output
+                    }
+                    
+                    Spacer()
                 }
-                TabButton(title: "File Tree", isSelected: selectedDetailTab == "File Tree") {
-                    selectedDetailTab = "File Tree"
-                }
-                TabButton(title: "Output", isSelected: selectedDetailTab == "Output") {
-                    selectedDetailTab = "Output"
-                }
-                
-                Spacer()
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(Color.white)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .background(Color.white)
             
-            // Main content
-            switch selectedDetailTab {
-            case "Main":
+            switch viewModel.activePage {
+            case .main:
                 MainInputView(viewModel: viewModel)
-            case "File Tree":
+            case .fileTree:
                 FileTreeMainView(viewModel: viewModel)
-            case "Output":
+            case .output:
                 OutputMainView(viewModel: viewModel)
-            default:
-                MainInputView(viewModel: viewModel)
+            case .recents:
+                RecentsPageView(viewModel: viewModel)
+            case .bookmarks:
+                BookmarksPageView(viewModel: viewModel)
             }
             
             Spacer()
             
-            // Footer
             FooterView()
         }
         .onChange(of: viewModel.selectedTab) { newValue in
-            // Auto-switch to File Tree when processing completes
             if newValue == 1 {
-                selectedDetailTab = "File Tree"
+                viewModel.activePage = .fileTree
             }
-            // Auto-switch to Output when generation completes
             else if newValue == 2 {
-                selectedDetailTab = "Output"
+                viewModel.activePage = .output
             }
         }
         .onChange(of: viewModel.isGeneratingOutput) { isGenerating in
-            // Switch to Output tab immediately when generation completes
             if !isGenerating && !viewModel.generatedOutput.isEmpty {
-                selectedDetailTab = "Output"
+                viewModel.activePage = .output
+                viewModel.checkCurrentOutputBookmarkStatus()
             }
         }
     }
@@ -303,7 +298,6 @@ struct MainInputView: View {
         VStack(spacing: 32) {
             AppLogoView(size: 128)
             
-            // Main form with proper macOS styling
             VStack(spacing: 24) {
                 VStack(spacing: 16) {
                     Picker("", selection: $viewModel.repoType) {
@@ -314,13 +308,11 @@ struct MainInputView: View {
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     
-                    // Conditional fields based on repo type
                     if viewModel.repoType == .github {
                         VStack(spacing: 12) {
                             TextField("GitHub Repository URL", text: $viewModel.githubURL)
                                 .textFieldStyle(.roundedBorder)
                             
-                            // Optional token field
                             SecureField("Personal Access Token (optional for public repos)", text: $viewModel.accessToken)
                                 .textFieldStyle(.roundedBorder)
                         }
@@ -364,7 +356,6 @@ struct MainInputView: View {
             )
             .frame(maxWidth: 500)
             
-            // Process button with proper macOS styling
             Button(action: {
                 viewModel.processRepository()
             }) {
@@ -377,16 +368,14 @@ struct MainInputView: View {
                     Text(viewModel.isLoading ? "Processing..." : "Process Repository")
                         .font(.system(size: 14, weight: .medium))
                 }
-                .frame(minWidth: 120)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.bordered)
             .disabled(viewModel.isLoading)
         }
         .padding(40)
     }
 }
 
-// MARK: - Glass Styles
 
 struct GlassTextFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
@@ -488,7 +477,6 @@ struct FileTreeMainView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Top controls
             HStack {
                 Button(action: {
                     if viewModel.isGeneratingOutput {
@@ -497,23 +485,22 @@ struct FileTreeMainView: View {
                         viewModel.generateOutput()
                     }
                 }) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 4) {
                         if viewModel.isGeneratingOutput {
                             ProgressView()
-                                .scaleEffect(0.8)
+                                .scaleEffect(0.5)
                                 .progressViewStyle(CircularProgressViewStyle(tint: .primary))
                         }
                         Text(viewModel.isGeneratingOutput ? "Generating..." : "Generate Output")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                     }
-                    .frame(minWidth: 140)
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.small)
                 .disabled(viewModel.fileTree == nil)
                 
                 Spacer()
                 
-                // Token counts and exclude button
                 HStack(spacing: 12) {
                     if let fileTree = viewModel.fileTree {
                         TokenCountsView(fileTree: fileTree)
@@ -528,7 +515,6 @@ struct FileTreeMainView: View {
             
             Divider()
             
-            // File tree content
             if let fileTree = viewModel.fileTree {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
@@ -564,7 +550,6 @@ struct FileTreeNodeView: View {
     init(node: FileNode, level: Int) {
         self.node = node
         self.level = level
-        // Main folder (level 0) should be expanded, all others collapsed
         self._isExpanded = State(initialValue: level == 0)
     }
     
@@ -583,7 +568,6 @@ struct FileTreeNodeView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 4) {
-                // Indentation
                 HStack(spacing: 0) {
                     ForEach(0..<level, id: \.self) { _ in
                         Rectangle()
@@ -592,7 +576,6 @@ struct FileTreeNodeView: View {
                     }
                 }
                 
-                // Folder arrow or file icon
                 if node.isDirectory {
                     Button(action: {
                         withAnimation(.easeInOut(duration: 0.2)) {
@@ -608,7 +591,7 @@ struct FileTreeNodeView: View {
                     
                     Image(systemName: isExpanded ? "folder.fill" : "folder")
                         .font(.system(size: 14))
-                        .foregroundColor(.blue)
+                        .foregroundColor(.secondary)
                 } else {
                     Rectangle()
                         .fill(Color.clear)
@@ -619,14 +602,12 @@ struct FileTreeNodeView: View {
                         .foregroundColor(.secondary)
                 }
                 
-                // File/folder name
                 Text(node.name)
                     .font(.system(size: 13))
                     .lineLimit(1)
                 
                 Spacer()
                 
-                // Token count and checkbox
                 HStack(spacing: 8) {
                     if node.isDirectory {
                         let folderTokens = calculateFolderTokens(node)
@@ -641,15 +622,19 @@ struct FileTreeNodeView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    Toggle("", isOn: $node.isIncluded)
-                        .toggleStyle(.checkbox)
-                        .scaleEffect(0.8)
+                    Toggle("", isOn: Binding(
+                        get: { node.isIncluded },
+                        set: { newValue in
+                            node.updateInclusion(isIncluded: newValue, includeChildren: true)
+                        }
+                    ))
+                    .toggleStyle(.checkbox)
+                    .scaleEffect(0.8)
                 }
             }
             .padding(.vertical, 2)
             .contentShape(Rectangle())
             
-            // Children (if expanded)
             if isExpanded && node.isDirectory {
                 ForEach(node.children, id: \.id) { child in
                     FileTreeNodeView(node: child, level: level + 1)
@@ -662,6 +647,29 @@ struct FileTreeNodeView: View {
 struct OutputMainView: View {
     @ObservedObject var viewModel: MainViewModel
     
+    private func showSavePanel() {
+        let savePanel = NSSavePanel()
+        savePanel.allowedContentTypes = [.plainText, .item]
+        savePanel.nameFieldStringValue = "repository_output"
+        savePanel.allowsOtherFileTypes = true
+        savePanel.canCreateDirectories = true
+        
+        let response = savePanel.runModal()
+        if response == .OK, let url = savePanel.url {
+            var finalURL = url
+            
+            if finalURL.pathExtension.isEmpty {
+                finalURL = finalURL.appendingPathExtension("txt")
+            }
+            
+            do {
+                try viewModel.generatedOutput.write(to: finalURL, atomically: true, encoding: .utf8)
+            } catch {
+                viewModel.showError("Failed to save file: \(error.localizedDescription)")
+            }
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             if viewModel.isGeneratingOutput {
@@ -673,7 +681,6 @@ struct OutputMainView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !viewModel.generatedOutput.isEmpty {
-                // Output header with stats
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -682,7 +689,6 @@ struct OutputMainView: View {
                             
                             Spacer()
                             
-                            // Export options with icons
                             HStack(spacing: 8) {
                                 Button(action: {
                                     let pasteboard = NSPasteboard.general
@@ -696,35 +702,30 @@ struct OutputMainView: View {
                                 .controlSize(.small)
                                 
                                 Button(action: {
-                                    // TODO: Implement bookmark
+                                    viewModel.toggleCurrentOutputBookmark()
                                 }) {
-                                    Image(systemName: "bookmark")
+                                    Image(systemName: viewModel.isCurrentOutputBookmarked ? "bookmark.fill" : "bookmark")
                                         .font(.system(size: 12))
+                                        .foregroundColor(viewModel.isCurrentOutputBookmarked ? .black : .primary)
                                 }
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
                                 
-                                Menu {
-                                    Button("Save as .txt") {
-                                        // TODO: Implement save as txt
-                                    }
-                                    Button("Save as .md") {
-                                        // TODO: Implement save as md
-                                    }
-                                } label: {
-                                    Image(systemName: "square.and.arrow.up")
+                                Button(action: {
+                                    showSavePanel()
+                                }) {
+                                    Image(systemName: "arrow.down.circle")
                                         .font(.system(size: 12))
                                 }
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
-                                .menuStyle(.borderlessButton)
                             }
                         }
                         
                         HStack(spacing: 16) {
                             Label("182,894", systemImage: "number")
                             Label("187", systemImage: "doc")
-                            Label("RechtGPT-V2", systemImage: "folder")
+                            Label(viewModel.currentRepository?.name ?? "Repository", systemImage: "folder")
                         }
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -738,7 +739,6 @@ struct OutputMainView: View {
                 
                 Divider()
                 
-                // Output content
                 ScrollView {
                     Text(viewModel.generatedOutput)
                         .font(.system(.body, design: .monospaced))
@@ -748,9 +748,6 @@ struct OutputMainView: View {
                 .scrollIndicators(.visible)
             } else {
                 VStack {
-                    Image(systemName: "doc.text")
-                        .font(.system(size: 48))
-                        .foregroundColor(.secondary)
                     Text("No output generated")
                         .font(.headline)
                         .foregroundColor(.secondary)
@@ -765,7 +762,8 @@ struct OutputMainView: View {
 }
 
 struct TokenCountsView: View {
-    let fileTree: FileNode
+    @ObservedObject var fileTree: FileNode
+    @State private var updateTrigger = 0
     
     private var totalTokens: Int {
         calculateTotalTokens(fileTree)
@@ -788,12 +786,16 @@ struct TokenCountsView: View {
     }
     
     private func calculateSelectedTokens(_ node: FileNode) -> Int {
+        if !node.isIncluded {
+            return 0
+        }
+        
         var total = 0
         if node.isDirectory {
             for child in node.children {
                 total += calculateSelectedTokens(child)
             }
-        } else if node.isIncluded {
+        } else {
             total += node.tokenCount
         }
         return total
@@ -807,6 +809,17 @@ struct TokenCountsView: View {
             Text("Selected: \(selectedTokens.formatted())")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.primary)
+        }
+        .id(updateTrigger)
+        .onReceive(fileTree.objectWillChange) { _ in
+            DispatchQueue.main.async {
+                updateTrigger += 1
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("FileNodeChanged"))) { _ in
+            DispatchQueue.main.async {
+                updateTrigger += 1
+            }
         }
     }
 }
@@ -894,7 +907,7 @@ struct FooterView: View {
             Spacer()
             
             Button(action: {
-                if let url = URL(string: "https://github.com/rogierx") {
+                if let url = URL(string: "https:
                     NSWorkspace.shared.open(url)
                 }
             }) {
@@ -915,49 +928,17 @@ struct FooterView: View {
     }
 }
 
-// MARK: - Sidebar Popover Views
-
-struct RecentsView: View {
-    @ObservedObject var viewModel: MainViewModel
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Recent Repositories")
-                .font(.headline)
-            
-            if viewModel.recentRepositories.isEmpty {
-                Text("No recent repositories")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            } else {
-                ForEach(viewModel.recentRepositories, id: \.self) { repo in
-                    Button(action: {
-                        viewModel.loadRecentRepository(repo)
-                    }) {
-                        HStack {
-                            Image(systemName: "folder")
-                                .foregroundColor(.blue)
-                            Text(repo)
-                                .font(.system(size: 13))
-                            Spacer()
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .padding(16)
-        .frame(width: 300)
-    }
-}
-
 struct BookmarksView: View {
     @ObservedObject var viewModel: MainViewModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Repository Bookmarks")
+            Text("Bookmarks")
                 .font(.headline)
+            
+            Text("Repository Bookmarks")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
             
             if viewModel.bookmarkedRepositories.isEmpty {
                 Text("No bookmarked repositories")
@@ -991,27 +972,19 @@ struct BookmarksView: View {
                 }
             }
             
-            Divider()
-            
             if let currentRepo = viewModel.currentRepository {
-                Button("Bookmark Current") {
+                Button("Bookmark Current Repository") {
                     viewModel.addBookmark(currentRepo.fullName)
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.small)
             }
-        }
-        .padding(16)
-        .frame(width: 320)
-    }
-}
-
-struct OutputBookmarksView: View {
-    @ObservedObject var viewModel: MainViewModel
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+            
+            Divider()
+            
             Text("Output Bookmarks")
-                .font(.headline)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
             
             if viewModel.savedOutputs.isEmpty {
                 Text("No saved outputs")
@@ -1048,54 +1021,269 @@ struct OutputBookmarksView: View {
                 }
             }
             
-            Divider()
-            
             if !viewModel.generatedOutput.isEmpty {
                 Button("Save Current Output") {
                     viewModel.saveCurrentOutput()
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.small)
             }
         }
         .padding(16)
-        .frame(width: 340)
+        .frame(width: 360)
     }
 }
 
+
+
 struct SettingsView: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Settings")
-                .font(.headline)
+        VStack(alignment: .center, spacing: 16) {
+            Group {
+                if let appIcon = NSImage(contentsOfFile: "appicon.png") ?? NSImage(named: "appicon") {
+                    Image(nsImage: appIcon)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 100, height: 100)
+                        .cornerRadius(20)
+                } else {
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 100, height: 100)
+                        .overlay(
+                            Image(systemName: "app")
+                                .font(.system(size: 50))
+                                .foregroundColor(.secondary)
+                        )
+                }
+            }
             
-            VStack(alignment: .leading, spacing: 8) {
-                Text("About RepoForge")
-                    .font(.system(size: 13, weight: .medium))
+            VStack(alignment: .center, spacing: 12) {
+                Text("Settings")
+                    .font(.headline)
                 
                 Text("Convert repositories to LLM-ready text format")
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
                 
-                Text("Version 1.0.0")
-                    .font(.system(size: 11))
+                VStack(spacing: 8) {
+                    Button("Clear All Data") {
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Button("Visit GitHub") {
+                        if let url = URL(string: "https:
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+        }
+        .padding(16)
+        .frame(width: 280, height: 320)
+    }
+}
+
+struct RecentsPageView: View {
+    @ObservedObject var viewModel: MainViewModel
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 24) {
+                RecentsASCIIView()
+                    .padding(.top, 80)
+                
+                if viewModel.recentRepositories.isEmpty {
+                    Text("No recents yet")
+                        .font(.system(.body))
+                        .foregroundColor(.secondary)
+                } else {
+                    VStack(spacing: 16) {
+                        ForEach(viewModel.recentRepositories.prefix(5), id: \.self) { repo in
+                            RecentRepoCard(repo: repo, viewModel: viewModel)
+                        }
+                    }
+                    .padding(24)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color(NSColor.separatorColor), lineWidth: 1)
+                            )
+                    )
+                    .frame(maxWidth: 500)
+                }
+            }
+            
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct BookmarksPageView: View {
+    @ObservedObject var viewModel: MainViewModel
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 24) {
+                BookmarksASCIIView()
+                    .padding(.top, 80)
+                
+                if viewModel.savedOutputs.isEmpty {
+                    Text("No bookmarks yet")
+                        .font(.system(.body))
+                        .foregroundColor(.secondary)
+                } else {
+                    VStack(spacing: 16) {
+                        ForEach(viewModel.savedOutputs.prefix(5)) { output in
+                            BookmarkCard(output: output, viewModel: viewModel)
+                        }
+                    }
+                    .padding(24)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color(NSColor.separatorColor), lineWidth: 1)
+                            )
+                    )
+                    .frame(maxWidth: 500)
+                }
+            }
+            
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct RecentRepoCard: View {
+    let repo: RecentRepository
+    @ObservedObject var viewModel: MainViewModel
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(repo.path)
+                    .font(.system(size: 14, weight: .medium))
+                    .lineLimit(1)
+                
+                Text("\(repo.type.rawValue) Repository")
+                    .font(.system(size: 12))
                     .foregroundColor(.secondary)
             }
             
-            Divider()
+            Spacer()
             
-            Button("Clear All Data") {
-                // TODO: Implement clear all data
-            }
-            .buttonStyle(.bordered)
-            
-            Button("Visit GitHub") {
-                if let url = URL(string: "https://github.com/rogierx/RepoForge") {
-                    NSWorkspace.shared.open(url)
+            HStack(spacing: 8) {
+                Button("Use") {
+                    if repo.type == .github {
+                        viewModel.githubURL = repo.path
+                        viewModel.repoType = .github
+                    } else {
+                        viewModel.localPath = repo.path
+                        viewModel.repoType = .local
+                    }
+                    viewModel.activePage = .main
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                
+                Button(action: {
+                    viewModel.deleteRecentRepository(repo)
+                }) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .foregroundColor(.red)
             }
-            .buttonStyle(.bordered)
         }
         .padding(16)
-        .frame(width: 280)
+        .background(Color(.controlBackgroundColor))
+        .cornerRadius(8)
+    }
+}
+
+struct BookmarkCard: View {
+    let output: SavedOutput
+    @ObservedObject var viewModel: MainViewModel
+    @State private var isLoading = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(output.name)
+                        .font(.system(size: 14, weight: .medium))
+                        .lineLimit(1)
+                    
+                    Text(output.createdAt.formatted(date: .abbreviated, time: .shortened))
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                HStack(spacing: 8) {
+                    Button(action: {
+                        Task {
+                            await loadOutput()
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            if isLoading {
+                                ProgressView()
+                                    .scaleEffect(0.6)
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .primary))
+                            }
+                            Text("View")
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(isLoading)
+                    
+                    Button(action: {
+                        viewModel.removeOutputBookmark(output)
+                    }) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 12))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .foregroundColor(.red)
+                }
+            }
+            
+            HStack(spacing: 16) {
+                Label("\(output.tokenCount.formatted())", systemImage: "number")
+                Label("\(output.fileCount)", systemImage: "doc")
+            }
+            .font(.system(size: 11))
+            .foregroundColor(.secondary)
+        }
+        .padding(16)
+        .background(Color(.controlBackgroundColor))
+        .cornerRadius(8)
+    }
+    
+    @MainActor
+    private func loadOutput() async {
+        isLoading = true
+        
+        viewModel.activePage = .output
+        
+        try? await Task.sleep(nanoseconds: 10_000_000)
+        
+        viewModel.generatedOutput = output.content
+        
+        isLoading = false
     }
 }

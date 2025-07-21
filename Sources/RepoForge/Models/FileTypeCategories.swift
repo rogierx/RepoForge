@@ -1,6 +1,5 @@
 import Foundation
 
-// MARK: - Enhanced File Type Categorization (inspired by repo2txt)
 
 class FileTypeCategories: @unchecked Sendable {
     static let shared = FileTypeCategories()

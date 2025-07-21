@@ -1,9 +1,3 @@
-//
-//  GitHubService.swift
-//  RepoForge
-//
-//  Created by Rogier on 2025-07-18.
-//
 
 import Foundation
 
@@ -22,7 +16,7 @@ class GitHubService: ObservableObject {
         self.config = GitHubAPIConfig(token: token)
         
         let configuration = URLSessionConfiguration.default
-        configuration.httpMaximumConnectionsPerHost = 8 // Further reduced for stability
+        configuration.httpMaximumConnectionsPerHost = 8
         configuration.timeoutIntervalForRequest = 30
         configuration.timeoutIntervalForResource = 120
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
@@ -41,7 +35,6 @@ class GitHubService: ObservableObject {
         return try await performRequest(endpoint: endpoint, type: Repository.self)
     }
     
-    // Builds the file tree entirely in the background.
     func buildFileTree(owner: String, repo: String, includeVirtualEnvironments: Bool) async throws -> FileNode {
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
@@ -60,9 +53,6 @@ class GitHubService: ObservableObject {
     private func buildStructure(owner: String, repo: String, includeVirtualEnvironments: Bool) async throws -> FileNode {
         await MainActor.run { currentStatus = "Fetching repository tree..." }
         
-        // Skip .gitignore loading for speed - just use basic filtering
-        // await MainActor.run { currentStatus = "Loading .gitignore patterns..." }
-        // await loadGitIgnoreFile(owner: owner, repo: repo)
         
         do {
             let gitTree = try await fetchRepositoryTree(owner: owner, repo: repo)
@@ -88,7 +78,6 @@ class GitHubService: ObservableObject {
                 await MainActor.run { currentStatus = "Loaded .gitignore with \(gitIgnoreService.getActivePatterns().count) patterns" }
             }
         } catch {
-            // .gitignore file doesn't exist or couldn't be loaded - that's fine
             await MainActor.run { currentStatus = "No .gitignore file found, using default filtering" }
         }
     }
@@ -97,23 +86,19 @@ class GitHubService: ObservableObject {
         let root = FileNode(name: repo, path: "", type: .directory)
         var pathToNode: [String: FileNode] = ["": root]
         
-        // Sort items by path depth for proper parent-child relationships
         let sortedItems = gitTree.tree.sorted { $0.path.count < $1.path.count }
         
-        // Apply repo2txt-style filtering during tree construction
         
         for item in sortedItems {
             let fileName = URL(fileURLWithPath: item.path).lastPathComponent
             let isDirectory = item.type != "blob"
             
-            // Apply basic filtering only (skip .gitignore for speed)
             let shouldInclude = !FileNode.shouldExcludeByDefault(
                 path: item.path,
                 name: fileName,
                 includeVirtualEnvironments: includeVirtualEnvironments
             )
             
-            // Skip creating nodes for items that should be filtered out
             if !shouldInclude {
                 continue
             }
@@ -125,7 +110,6 @@ class GitHubService: ObservableObject {
                 size: item.size ?? 0
             )
             
-            // Set inclusion based on our filtering
             node.isIncluded = shouldInclude
             
             let parentPath = String(item.path.split(separator: "/").dropLast().joined(separator: "/"))
@@ -169,7 +153,7 @@ class GitHubService: ObservableObject {
         guard fileNode.type == .file, fileNode.content == nil else { return }
         
         if fileNode.size > 2_000_000 {
-            fileNode.content = "// File is too large to display."
+            fileNode.content = "
             return
         }
         
@@ -177,19 +161,18 @@ class GitHubService: ObservableObject {
             let content = try await fetchFileContent(owner: owner, repo: repo, path: fileNode.path)
             if let fileContent = content.content, let encoding = content.encoding {
                 if encoding == "base64", let data = Data(base64Encoded: fileContent.replacingOccurrences(of: "\n", with: "")) {
-                    fileNode.content = String(data: data, encoding: .utf8) ?? "// Could not decode binary content."
+                    fileNode.content = String(data: data, encoding: .utf8) ?? "
                 } else {
                     fileNode.content = fileContent
                 }
             } else {
-                fileNode.content = "// Content is empty or not available."
+                fileNode.content = "
             }
         } catch {
-            fileNode.content = "// Error loading content: \(error.localizedDescription)"
+            fileNode.content = "
         }
     }
     
-    // MARK: - API Calls
     
     private func fetchContents(owner: String, repo: String, path: String) async throws -> [RepositoryContent] {
         let endpoint = "\(config.baseURL)/repos/\(owner)/\(repo)/contents/\(path)"
@@ -245,7 +228,6 @@ class GitHubService: ObservableObject {
     }
 }
 
-// Helper for chunking arrays
 extension Array {
     func chunked(into size: Int) -> [[Element]] {
         return stride(from: 0, to: count, by: size).map {
@@ -254,13 +236,11 @@ extension Array {
     }
 }
 
-// Helper for error response parsing
 private struct GitHubErrorResponse: Codable {
     let message: String
     let documentation_url: String?
 }
 
-// Helper for formatting bytes
 private func formatBytes(_ bytes: Int) -> String {
     let formatter = ByteCountFormatter()
     formatter.countStyle = .file

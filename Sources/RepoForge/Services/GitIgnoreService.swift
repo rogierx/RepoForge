@@ -1,6 +1,5 @@
 import Foundation
 
-// MARK: - Git Ignore Pattern Matching Service (inspired by repo2txt)
 
 class GitIgnoreService: @unchecked Sendable {
     private var patterns: [GitIgnorePattern] = []
@@ -21,18 +20,15 @@ class GitIgnoreService: @unchecked Sendable {
             let patternWithoutNegation = isNegation ? String(trimmedLine.dropFirst()) : trimmedLine
             self.isDirectory = patternWithoutNegation.hasSuffix("/")
             
-            // Remove trailing slash for directory patterns
             self.pattern = isDirectory ? String(patternWithoutNegation.dropLast()) : patternWithoutNegation
         }
     }
     
     init() {
-        // Load global ignore patterns (similar to repo2txt's common ignore patterns)
         loadGlobalPatterns()
     }
     
     private func loadGlobalPatterns() {
-        // Common patterns that should always be ignored (inspired by repo2txt config)
         let globalIgnorePatterns = [
             ".DS_Store",
             "Thumbs.db",
@@ -81,7 +77,6 @@ class GitIgnoreService: @unchecked Sendable {
         for line in lines {
             let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
             
-            // Skip empty lines and comments
             if trimmedLine.isEmpty || trimmedLine.hasPrefix("#") {
                 continue
             }
@@ -91,12 +86,10 @@ class GitIgnoreService: @unchecked Sendable {
     }
     
     func shouldIgnore(path: String, isDirectory: Bool) -> Bool {
-        // Check global patterns first
         if matchesAnyPattern(path: path, isDirectory: isDirectory, patterns: globalPatterns) {
             return true
         }
         
-        // Check .gitignore patterns
         return matchesAnyPattern(path: path, isDirectory: isDirectory, patterns: patterns)
     }
     
@@ -106,9 +99,9 @@ class GitIgnoreService: @unchecked Sendable {
         for pattern in patterns {
             if matchesPattern(path: path, isDirectory: isDirectory, pattern: pattern) {
                 if pattern.isNegation {
-                    isIgnored = false // Negation pattern - don't ignore
+                    isIgnored = false
                 } else {
-                    isIgnored = true // Normal pattern - ignore
+                    isIgnored = true
                 }
             }
         }
@@ -117,7 +110,6 @@ class GitIgnoreService: @unchecked Sendable {
     }
     
     private func matchesPattern(path: String, isDirectory: Bool, pattern: GitIgnorePattern) -> Bool {
-        // If pattern is for directories only, but path is a file, no match
         if pattern.isDirectory && !isDirectory {
             return false
         }
@@ -125,48 +117,39 @@ class GitIgnoreService: @unchecked Sendable {
         let pathComponents = path.split(separator: "/").map(String.init)
         let fileName = pathComponents.last ?? path
         
-        // Simple wildcard matching (basic implementation)
         if pattern.pattern.contains("*") {
             return matchesWildcardPattern(string: fileName, pattern: pattern.pattern) ||
                    matchesWildcardPattern(string: path, pattern: pattern.pattern)
         }
         
-        // Exact match
         if pattern.pattern == fileName || pattern.pattern == path {
             return true
         }
         
-        // Directory matching - check if any path component matches
         if pattern.isDirectory {
             return pathComponents.contains(pattern.pattern)
         }
         
-        // Check if path ends with the pattern
         return path.hasSuffix(pattern.pattern) || fileName == pattern.pattern
     }
     
     private func matchesWildcardPattern(string: String, pattern: String) -> Bool {
-        // Simple wildcard implementation
-        // Convert glob pattern to regex-like matching
         
         if pattern == "*" {
             return true
         }
         
         if pattern.hasPrefix("*.") {
-            // Extension matching
             let fileExtension = String(pattern.dropFirst(2))
             return string.hasSuffix("." + fileExtension)
         }
         
         if pattern.hasSuffix("*") {
-            // Prefix matching
             let prefix = String(pattern.dropLast())
             return string.hasPrefix(prefix)
         }
         
         if pattern.contains("*") {
-            // Contains matching (simplified)
             let parts = pattern.split(separator: "*").map(String.init)
             var lastIndex = string.startIndex
             
@@ -182,18 +165,14 @@ class GitIgnoreService: @unchecked Sendable {
         return string == pattern
     }
     
-    // Enhanced file type checking that integrates with .gitignore
     func isAllowedFile(path: String, fileName: String, isDirectory: Bool, fileSize: Int) -> Bool {
-        // First check .gitignore patterns
         if shouldIgnore(path: path, isDirectory: isDirectory) {
             return false
         }
         
-        // Then apply basic filtering using existing FileNode logic
         return !FileNode.shouldExcludeByDefault(path: path, name: fileName, includeVirtualEnvironments: true)
     }
     
-    // Get filtering statistics
     func getFilteringStats(for files: [String]) -> (ignored: Int, allowed: Int) {
         var ignored = 0
         var allowed = 0
@@ -211,7 +190,6 @@ class GitIgnoreService: @unchecked Sendable {
         return (ignored: ignored, allowed: allowed)
     }
     
-    // Debug method to see which patterns are active
     func getActivePatterns() -> [String] {
         return patterns.map { pattern in
             var result = pattern.pattern

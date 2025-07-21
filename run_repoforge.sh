@@ -53,8 +53,6 @@ cat > RepoForge.app/Contents/Info.plist << 'EOF'
     <string>RepoForge</string>
     <key>CFBundleIdentifier</key>
     <string>com.rogierx.RepoForge</string>
-    <key>CFBundleName</key>
-    <string>RepoForge</string>
     <key>CFBundleVersion</key>
     <string>1.0</string>
     <key>CFBundleShortVersionString</key>

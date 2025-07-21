@@ -9,13 +9,11 @@ let package = Package(
         .macOS(.v13)
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0")
     ],
     targets: [
         .executableTarget(
             name: "RepoForge",
             dependencies: [
-                .product(name: "Crypto", package: "swift-crypto")
             ],
             resources: [
                 .copy("Resources")

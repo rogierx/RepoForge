@@ -1,21 +1,14 @@
 import Foundation
 
-// Using @unchecked Sendable because the class is not final, but we will ensure
-// thread-safe access in practice.
 class TokenCountingService: @unchecked Sendable {
     
-    // Simplified, synchronous token counting.
-    // This will be called from a background thread.
     func countTokens(in text: String) -> Int {
         guard !text.isEmpty else { return 0 }
         
-        // A reasonable approximation for token count.
         let characterCount = text.count
         return max(1, Int(ceil(Double(characterCount) / 4.0)))
     }
     
-    // Synchronously updates token counts for a node and its children.
-    // This method is designed to be called from a background thread.
     func updateTokenCounts(for node: FileNode) {
         if node.isDirectory {
             var directoryTokenCount = 0
@@ -32,7 +25,6 @@ class TokenCountingService: @unchecked Sendable {
         }
     }
 
-    // Sorts nodes by token count. This should be called after counts are updated.
     func sortNodesByTokenCount(_ node: FileNode) {
         if node.isDirectory {
             for child in node.children {
@@ -42,7 +34,6 @@ class TokenCountingService: @unchecked Sendable {
         }
     }
     
-    // Calculates statistics based on the stored counts in the tree.
     func calculateStatistics(for rootNode: FileNode) -> ProcessingStatistics {
         var totalFiles = 0
         var includedFiles = 0
