@@ -1,4 +1,4 @@
-# repoforge
+# RepoForge
 
 ![RepoForge Logo](appicon.png)
 
