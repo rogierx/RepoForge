@@ -1,8 +1,8 @@
-# RepoForge
+# repoforge
 
 ![RepoForge Logo](appicon.png)
 
-**The Free macOS App That Converts Repositories to LLM-Friendly Text**
+**Free open-source macOS App That Converts Repositories to LLM-Friendly Text**
 
 ## What Makes RepoForge Different
 
